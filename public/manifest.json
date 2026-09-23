@@ -1,0 +1,22 @@
+{
+  "name": "Công An Phường Nam Đông Hà",
+  "short_name": "CAP Nam Đông Hà",
+  "description": "Hệ thống quản lý, phân công công việc CAP Nam Đông Hà - Quảng Trị",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#fff7ed",
+  "theme_color": "#7f1d1d",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSMAT1EEiTjShLjCbC_DbVGPRAXHcbA_IZNww&s",
+      "sizes": "192x192",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSMAT1EEiTjShLjCbC_DbVGPRAXHcbA_IZNww&s",
+      "sizes": "512x512",
+      "type": "image/svg+xml"
+    }
+  ]
+}

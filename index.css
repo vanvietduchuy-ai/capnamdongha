@@ -1,0 +1,16 @@
+@import "tailwindcss";
+
+/* Global styles */
+body {
+  margin: 0;
+  padding: 0;
+  font-family: 'Be Vietnam Pro', sans-serif;
+}
+
+/* Ensure QR scanner video fills its container correctly */
+#reader video {
+  object-fit: cover !important;
+  width: 100% !important;
+  height: 100% !important;
+  border-radius: 1rem;
+}
