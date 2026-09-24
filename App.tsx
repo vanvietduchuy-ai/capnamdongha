@@ -1387,7 +1387,7 @@ const App: React.FC = () => {
   const meta = VIEW_META[currentView] || VIEW_META.HOME;
 
   return (
-    <div className="min-h-screen bg-orange-50 flex text-stone-900">
+    <div className="min-h-screen bg-orange-50 flex text-stone-900" style={{ height: '100dvh', overflow: 'hidden' }}>
 
       <ToastNotification
          title={toastContent.title}
@@ -1420,7 +1420,7 @@ const App: React.FC = () => {
       {isMobileMenuOpen && (<div className="fixed inset-0 z-40 bg-stone-900/40 md:hidden" onClick={() => setIsMobileMenuOpen(false)}></div>)}
 
       {/* ============ THANH ĐIỀU HƯỚNG BÊN ============ */}
-      <aside style={{ height: '100dvh' }} className={`fixed md:sticky top-0 left-0 z-50 h-screen w-[280px] md:w-64 shrink-0 bg-white border-r border-stone-200 flex flex-col transition-transform duration-200 md:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'}`}>
+      <aside style={{ height: '100dvh', paddingTop: 'env(safe-area-inset-top)' }} className={`fixed md:sticky top-0 left-0 z-50 h-screen w-[280px] md:w-64 shrink-0 bg-white border-r border-stone-200 flex flex-col transition-transform duration-200 md:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'}`}>
         <div className="h-16 px-4 flex items-center gap-3 border-b border-stone-200 shrink-0">
           <img src={LOGO_URL} alt="" className="w-8 h-8 object-contain" />
           <div className="min-w-0 leading-tight">
@@ -1489,7 +1489,7 @@ const App: React.FC = () => {
 
       {/* ============ NỘI DUNG ============ */}
       <main style={{ height: '100dvh' }} className="flex-1 min-w-0 h-screen overflow-y-auto relative">
-        <header className="sticky top-0 z-30 h-14 md:h-16 bg-white/95 backdrop-blur border-b border-stone-200 flex items-center gap-2 md:gap-3 px-3 md:px-8">
+        <header className="sticky top-0 z-30 box-content pt-[env(safe-area-inset-top)] h-14 md:h-16 bg-white/95 backdrop-blur border-b border-stone-200 flex items-center gap-2 md:gap-3 px-3 md:px-8">
           <img src={LOGO_URL} alt="" className="md:hidden w-7 h-7 object-contain" />
           <div className="min-w-0 flex-1">
             <h1 className="text-[17px] md:text-lg font-semibold text-stone-900 truncate leading-tight">{meta.title}</h1>
@@ -1504,7 +1504,7 @@ const App: React.FC = () => {
               {unreadCount > 0 && <span className="absolute top-1 right-1 min-w-4 h-4 px-1 rounded-full bg-brand-700 text-white text-[10px] font-semibold flex items-center justify-center tabular">{unreadCount > 9 ? '9+' : unreadCount}</span>}
             </button>
             {showNotifPanel && (
-              <div className="fixed md:absolute left-3 right-3 md:left-auto md:right-0 top-14 md:top-12 md:w-[380px] bg-white rounded-xl shadow-xl border border-stone-200 overflow-hidden z-50 animate-fade-in-up">
+              <div className="fixed md:absolute left-3 right-3 md:left-auto md:right-0 top-[calc(3.5rem+env(safe-area-inset-top))] md:top-12 md:w-[380px] bg-white rounded-xl shadow-xl border border-stone-200 overflow-hidden z-50 animate-fade-in-up">
                 <div className="px-4 h-12 border-b border-stone-200 flex justify-between items-center">
                   <h3 className="text-sm font-semibold text-stone-900">Thông báo</h3>
                   <button onClick={handleMarkAllRead} className="text-xs font-medium text-stone-500 hover:text-stone-900">Đánh dấu đã đọc</button>
@@ -1546,7 +1546,7 @@ const App: React.FC = () => {
             {showAccountMenu && (
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setShowAccountMenu(false)} />
-                <div className="fixed right-3 top-14 z-50 w-64 bg-white rounded-xl shadow-xl border border-stone-200 overflow-hidden anim-rise" data-testid="account-menu">
+                <div style={{ top: 'calc(3.5rem + env(safe-area-inset-top))' }} className="fixed right-3 z-50 w-64 bg-white rounded-xl shadow-xl border border-stone-200 overflow-hidden anim-rise" data-testid="account-menu">
                   <div className="px-4 py-3 flex items-center gap-3 border-b border-stone-100">
                     <Avatar name={currentUser.fullName} size={36} />
                     <div className="min-w-0 leading-tight">

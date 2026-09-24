@@ -268,9 +268,9 @@ export const AttendanceScanner: React.FC<AttendanceScannerProps> = ({ currentUse
           <div className="icon-3d w-12 h-12 rounded-[14px] flex items-center justify-center mb-4" style={{ ['--c' as any]: '#0f766e' }}><ScanLine className="w-6 h-6" /></div>
           <h2 className="text-lg font-semibold text-stone-900">Quét mã điểm danh</h2>
           <ol className="mt-2 space-y-1.5 text-sm text-stone-600">
-            <li className="flex gap-2"><span className="w-5 h-5 rounded-full bg-stone-100 text-stone-600 text-xs font-semibold flex items-center justify-center shrink-0">1</span>Bấm <b className="font-semibold text-stone-800">Bắt đầu quét</b> và cho phép dùng camera.</li>
-            <li className="flex gap-2"><span className="w-5 h-5 rounded-full bg-stone-100 text-stone-600 text-xs font-semibold flex items-center justify-center shrink-0">2</span>Hướng camera vào mã QR đang chiếu trên màn hình hội nghị.</li>
-            <li className="flex gap-2"><span className="w-5 h-5 rounded-full bg-stone-100 text-stone-600 text-xs font-semibold flex items-center justify-center shrink-0">3</span>Ngồi xa thì bấm <b className="font-semibold text-stone-800">2×</b> hoặc <b className="font-semibold text-stone-800">4×</b> (hoặc chụm hai ngón) để phóng to. Mã đổi mỗi 3 giây — quét trực tiếp, không dùng ảnh chụp.</li>
+            <li className="flex gap-2"><span className="w-5 h-5 mt-px rounded-full bg-stone-100 text-stone-600 text-xs font-semibold flex items-center justify-center shrink-0">1</span><span>Bấm <b className="font-semibold text-stone-800">Bắt đầu quét</b> và cho phép dùng camera.</span></li>
+            <li className="flex gap-2"><span className="w-5 h-5 mt-px rounded-full bg-stone-100 text-stone-600 text-xs font-semibold flex items-center justify-center shrink-0">2</span><span>Hướng camera vào mã QR trên màn hình hội nghị.</span></li>
+            <li className="flex gap-2"><span className="w-5 h-5 mt-px rounded-full bg-stone-100 text-stone-600 text-xs font-semibold flex items-center justify-center shrink-0">3</span><span>Ngồi xa thì bấm <b className="font-semibold text-stone-800">2×</b> hoặc <b className="font-semibold text-stone-800">4×</b> để phóng to.</span></li>
           </ol>
           <div className="mt-5 space-y-2">
             <Button onClick={() => { setError(null); startScanning(); }} disabled={!isSystemReady} size="lg" className="w-full" icon={isSystemReady ? <Camera className="w-5 h-5" /> : <Loader2 className="w-5 h-5 animate-spin" />}>
@@ -363,9 +363,6 @@ export const AttendanceScanner: React.FC<AttendanceScannerProps> = ({ currentUse
         <Button onClick={stopScanning} variant="secondary" size="lg" className="w-full mt-3">Hủy bỏ</Button>
       </div>
 
-      <p className="text-xs text-stone-400 text-center pt-2">
-        Mã thiết bị: {deviceId || 'Đang tạo...'}
-      </p>
     </div>
   );
 };
