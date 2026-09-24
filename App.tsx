@@ -170,6 +170,7 @@ const App: React.FC = () => {
   const [showForgotModal, setShowForgotModal] = useState(false); 
   const [showRemindModal, setShowRemindModal] = useState(false); // New State for Reminder Modal
   const [showNotifPanel, setShowNotifPanel] = useState(false);
+  const [showAccountMenu, setShowAccountMenu] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [isCloudActive, setIsCloudActive] = useState(false);
   
@@ -232,6 +233,7 @@ const App: React.FC = () => {
     const hadUser = !!localStorage.getItem('currentUser');
     MockDB.logout().catch(() => {});
     try { navigator.serviceWorker?.controller?.postMessage({ type: 'CLEAR_BACKGROUND_LISTENER' }); } catch { /* bỏ qua */ }
+    try { (navigator as any).clearAppBadge?.()?.catch?.(() => {}); } catch { /* bỏ qua */ }
     localStorage.removeItem('currentUser');
     setCurrentUser(null);
     if (hadUser && message) setTimeout(() => alert(message), 50);
@@ -385,6 +387,12 @@ const App: React.FC = () => {
               if (event.data && (event.data.type === 'REFRESH_DATA' || event.data.type === 'BACKGROUND_REFRESH_COMPLETE')) {
                   console.log("Received Refresh signal from SW:", event.data.type);
                   reloadData();
+              }
+              // Số trên biểu tượng ứng dụng do trang đặt (an toàn hơn đặt trong service worker)
+              if (event.data && event.data.type === 'SET_BADGE') {
+                  const n = Number(event.data.count) || 0;
+                  const nav: any = navigator;
+                  try { (n ? nav.setAppBadge?.(n) : nav.clearAppBadge?.())?.catch?.(() => {}); } catch { /* bỏ qua */ }
               }
           });
       }
@@ -803,6 +811,7 @@ const App: React.FC = () => {
   const handleLogout = () => {
     MockDB.logout().catch(console.error);
     try { navigator.serviceWorker?.controller?.postMessage({ type: 'CLEAR_BACKGROUND_LISTENER' }); } catch { /* bỏ qua */ }
+    try { (navigator as any).clearAppBadge?.()?.catch?.(() => {}); } catch { /* bỏ qua */ }
     setCurrentUser(null);
     localStorage.removeItem('currentUser');
     setUsernameInput('');
@@ -1411,7 +1420,7 @@ const App: React.FC = () => {
       {isMobileMenuOpen && (<div className="fixed inset-0 z-40 bg-stone-900/40 md:hidden" onClick={() => setIsMobileMenuOpen(false)}></div>)}
 
       {/* ============ THANH ĐIỀU HƯỚNG BÊN ============ */}
-      <aside className={`fixed md:sticky top-0 left-0 z-50 h-screen w-[280px] md:w-64 shrink-0 bg-white border-r border-stone-200 flex flex-col transition-transform duration-200 md:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'}`}>
+      <aside style={{ height: '100dvh' }} className={`fixed md:sticky top-0 left-0 z-50 h-screen w-[280px] md:w-64 shrink-0 bg-white border-r border-stone-200 flex flex-col transition-transform duration-200 md:translate-x-0 ${isMobileMenuOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full'}`}>
         <div className="h-16 px-4 flex items-center gap-3 border-b border-stone-200 shrink-0">
           <img src={LOGO_URL} alt="" className="w-8 h-8 object-contain" />
           <div className="min-w-0 leading-tight">
@@ -1479,7 +1488,7 @@ const App: React.FC = () => {
       </aside>
 
       {/* ============ NỘI DUNG ============ */}
-      <main className="flex-1 min-w-0 h-screen overflow-y-auto relative">
+      <main style={{ height: '100dvh' }} className="flex-1 min-w-0 h-screen overflow-y-auto relative">
         <header className="sticky top-0 z-30 h-14 md:h-16 bg-white/95 backdrop-blur border-b border-stone-200 flex items-center gap-2 md:gap-3 px-3 md:px-8">
           <img src={LOGO_URL} alt="" className="md:hidden w-7 h-7 object-contain" />
           <div className="min-w-0 flex-1">
@@ -1528,6 +1537,27 @@ const App: React.FC = () => {
                   </div>
                 </div>
               </div>
+            )}
+          </div>
+          <div className="md:hidden relative">
+            <button onClick={() => { setShowAccountMenu(v => !v); setShowNotifPanel(false); }} aria-label="Tài khoản" data-testid="account-btn" className="p-1 rounded-full">
+              <Avatar name={currentUser.fullName} size={30} />
+            </button>
+            {showAccountMenu && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowAccountMenu(false)} />
+                <div className="fixed right-3 top-14 z-50 w-64 bg-white rounded-xl shadow-xl border border-stone-200 overflow-hidden anim-rise" data-testid="account-menu">
+                  <div className="px-4 py-3 flex items-center gap-3 border-b border-stone-100">
+                    <Avatar name={currentUser.fullName} size={36} />
+                    <div className="min-w-0 leading-tight">
+                      <p className="text-sm font-semibold text-stone-900 truncate">{currentUser.fullName}</p>
+                      <p className="text-xs text-stone-500 truncate">{currentUser.position || roleLabel(currentUser.role)}</p>
+                    </div>
+                  </div>
+                  <button onClick={() => { setShowAccountMenu(false); setShowChangePassModal(true); }} className="w-full h-11 px-4 flex items-center gap-3 text-sm text-stone-700 hover:bg-stone-50"><KeyRound className="w-4 h-4 text-stone-500" />Đổi mật khẩu</button>
+                  <button onClick={() => { setShowAccountMenu(false); handleLogout(); }} data-testid="account-logout" className="w-full h-11 px-4 flex items-center gap-3 text-sm font-medium text-brand-700 hover:bg-brand-50 border-t border-stone-100"><LogOut className="w-4 h-4" />Đăng xuất</button>
+                </div>
+              </>
             )}
           </div>
         </header>

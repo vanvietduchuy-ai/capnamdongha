@@ -1,13 +1,14 @@
 /* Service Worker cho ứng dụng Điểm danh Hội nghị – CAP Nam Đông Hà */
 /* Nhận thông báo nền bằng cách hỏi định kỳ Supabase (REST) */
 
-const CACHE_NAME = 'cap-namdongha-v4-hieu-ung';
+const CACHE_NAME = 'cap-namdongha-v5-dang-xuat';
 const ASSETS_TO_CACHE = ['/', '/index.html', '/manifest.json'];
 
 const DB_NAME = 'sw_config_db';
 const STORE_NAME = 'config_store';
 const CONFIG_KEY = 'cloud_config';
 const POLL_MS = 60000; // 1 phút/lần khi chạy nền
+let lastBadge = -1;
 
 /* ---------- INDEXEDDB: nhớ cấu hình kể cả khi đóng app ---------- */
 const dbPromise = new Promise((resolve, reject) => {
@@ -85,11 +86,14 @@ async function checkNotifications() {
     fresh.slice(0, 3).forEach(showNotification);
   }
 
-  if ('setAppBadge' in self.navigator) {
-    try {
-      if (data.length) self.navigator.setAppBadge(data.length);
-      else self.navigator.clearAppBadge();
-    } catch (e) {}
+  // Số trên biểu tượng ứng dụng, chỉ khi con số thay đổi.
+  // Đang mở ứng dụng: nhờ trang đặt số (an toàn). Chỉ khi ứng dụng đã đóng mới gọi trong service worker,
+  // vì trên một số bản Chromium gọi lệnh này trong service worker làm trang đang mở bị treo trắng.
+  if (data.length !== lastBadge) {
+    lastBadge = data.length;
+    const cs = await self.clients.matchAll({ type: 'window', includeUncontrolled: true }).catch(() => []);
+    if (cs.length) cs.forEach(c => c.postMessage({ type: 'SET_BADGE', count: data.length }));
+    else if ('setAppBadge' in self.navigator && data.length) { try { self.navigator.setAppBadge(data.length).catch(() => {}); } catch (e) {} }
   }
 }
 
@@ -127,7 +131,7 @@ self.addEventListener('message', (event) => {
     if (pollTimer) { clearInterval(pollTimer); pollTimer = null; }
     lastSeenAt = 0;
     saveConfigToDB(null);
-    try { self.navigator.clearAppBadge && self.navigator.clearAppBadge(); } catch (e) {}
+    lastBadge = -1; // trang tự xoá số trên biểu tượng khi đăng xuất
   }
 });
 
