@@ -1,4 +1,4 @@
-import { User, UserRole, UserDepartment, Task, TaskStatus, TaskPriority, RecurringType, AppNotification, Utility, CalendarEvent, AttendanceRecord, AttendanceSession, AttendanceAbsence, sessionState, sessionTime } from '../types';
+import { User, UserRole, UserDepartment, Task, TaskStatus, TaskPriority, RecurringType, AppNotification, Utility, CalendarEvent, AttendanceRecord, AttendanceSession, AttendanceAbsence, SeatLayout, SeatFlag, sessionState, sessionTime } from '../types';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { buildClient, setClientConfig, getClient, CloudConfig as StoredCloudConfig, callRpc, getSessionToken, setSessionToken } from '../lib/supabase';
 import { EmailService } from './emailService';
@@ -224,6 +224,16 @@ export const MockDB = {
              subscriptions.forEach(cb => cb('attendance_absences'));
           }
         )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'attendance_seat_flags' },
+          () => { subscriptions.forEach(cb => cb('attendance_seat_flags')); }
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'seating_layouts' },
+          () => { subscriptions.forEach(cb => cb('attendance_seating_layouts')); }
+        )
         .subscribe();
 
       return true;
@@ -285,7 +295,12 @@ export const MockDB = {
      if (qr.error) {
        return { ok: false, message: 'Chưa cài mã QR động có chữ ký. Hãy chạy file supabase/06_ma_qr_dong.sql.' };
      }
-     return { ok: true, message: 'Cơ sở dữ liệu đã đầy đủ bảng và hàm nghiệp vụ (01–06).' };
+     const seat = await client.from('seating_layouts').select('id').limit(1);
+     const flag = await client.rpc('app_flag_seat', { p_token: 'kiem-tra-cai-dat-000000000000', p_session_id: '__kiem_tra__', p_user_id: '__x__', p_status: null });
+     if (seat.error || flag.error) {
+       return { ok: false, message: 'Chưa cài sơ đồ chỗ ngồi. Hãy chạy file supabase/07_so_do_cho_ngoi.sql.' };
+     }
+     return { ok: true, message: 'Cơ sở dữ liệu đã đầy đủ bảng và hàm nghiệp vụ (01–07).' };
   },
 
   subscribe: (callback: (table?: string) => void) => {
@@ -1299,6 +1314,73 @@ export const MockDB = {
       const stored = localStorage.getItem('attendance_sessions');
       const all: AttendanceSession[] = stored ? JSON.parse(stored) : [];
       localStorage.setItem('attendance_sessions', JSON.stringify(all.filter(s => s.id !== id || s.status !== 'DRAFT')));
+      return { ok: true };
+  },
+
+  // --- SƠ ĐỒ CHỖ NGỒI & ĐỐI SÁNH ---
+  getSeatLayouts: async (): Promise<SeatLayout[]> => {
+      if (supabase) {
+          const { data, error } = await supabase.from('seating_layouts').select('*').order('name');
+          if (error) { console.warn('Chưa có bảng sơ đồ chỗ ngồi (chạy 07_so_do_cho_ngoi.sql):', error.message); return []; }
+          return ((data as SeatLayout[]) || []).map(l => ({ ...l, seats: Array.isArray(l.seats) ? l.seats : [] }));
+      }
+      try { return JSON.parse(localStorage.getItem('seat_layouts') || '[]'); } catch { return []; }
+  },
+
+  saveSeatLayout: async (layout: SeatLayout): Promise<{ ok: boolean; message?: string; layout?: SeatLayout }> => {
+      if (supabase) {
+          const res = await callRpc<{ layout: SeatLayout }>('app_save_layout', { p_token: getSessionToken(), p_layout: layout });
+          return res.ok ? { ok: true, layout: (res as any).layout } : { ok: false, message: res.message };
+      }
+      const all: SeatLayout[] = JSON.parse(localStorage.getItem('seat_layouts') || '[]');
+      const l = { ...layout, id: layout.id || `lay_${Date.now()}`, updatedAt: Date.now() };
+      localStorage.setItem('seat_layouts', JSON.stringify([...all.filter(x => x.id !== l.id), l]));
+      return { ok: true, layout: l };
+  },
+
+  deleteSeatLayout: async (id: string): Promise<{ ok: boolean; message?: string }> => {
+      if (supabase) {
+          const res = await callRpc('app_delete_layout', { p_token: getSessionToken(), p_id: id });
+          return res.ok ? { ok: true } : { ok: false, message: res.message };
+      }
+      const all: SeatLayout[] = JSON.parse(localStorage.getItem('seat_layouts') || '[]');
+      localStorage.setItem('seat_layouts', JSON.stringify(all.filter(x => x.id !== id)));
+      return { ok: true };
+  },
+
+  setMeetingSeating: async (sessionId: string, layoutId: string | null, enabled: boolean): Promise<{ ok: boolean; message?: string }> => {
+      if (supabase) {
+          const res = await callRpc('app_set_meeting_seating', { p_token: getSessionToken(), p_session_id: sessionId, p_layout_id: layoutId, p_enabled: enabled });
+          return res.ok ? { ok: true } : { ok: false, message: res.message };
+      }
+      const all: AttendanceSession[] = JSON.parse(localStorage.getItem('attendance_sessions') || '[]');
+      const s = all.find(x => x.id === sessionId);
+      if (s) { s.seatCompare = enabled; if (layoutId) s.seatLayoutId = layoutId; }
+      localStorage.setItem('attendance_sessions', JSON.stringify(all));
+      return { ok: true };
+  },
+
+  getSeatFlags: async (sessionIds: string[]): Promise<SeatFlag[]> => {
+      if (!sessionIds.length) return [];
+      if (supabase) {
+          const { data, error } = await supabase.from('attendance_seat_flags').select('*').in('sessionId', sessionIds.slice(0, 200));
+          if (error) return [];
+          return (data as SeatFlag[]) || [];
+      }
+      const all: SeatFlag[] = JSON.parse(localStorage.getItem('seat_flags') || '[]');
+      return all.filter(f => sessionIds.includes(f.sessionId));
+  },
+
+  flagSeat: async (sessionId: string, userId: string, status: 'SUSPECT' | 'CONFIRMED' | null): Promise<{ ok: boolean; message?: string }> => {
+      if (supabase) {
+          const res = await callRpc('app_flag_seat', { p_token: getSessionToken(), p_session_id: sessionId, p_user_id: userId, p_status: status });
+          return res.ok ? { ok: true } : { ok: false, message: res.message };
+      }
+      const id = `${sessionId}__${userId}`;
+      const all: SeatFlag[] = JSON.parse(localStorage.getItem('seat_flags') || '[]');
+      const rest = all.filter(f => f.id !== id);
+      if (status) rest.push({ id, sessionId, userId, status, flaggedAt: Date.now() });
+      localStorage.setItem('seat_flags', JSON.stringify(rest));
       return { ok: true };
   },
 

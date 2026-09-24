@@ -6,7 +6,7 @@ Công an phường Nam Đông Hà · Dữ liệu lưu trên **Supabase** (Postgr
 
 ## 1. Cài đặt cơ sở dữ liệu (làm 1 lần, khoảng 5 phút)
 
-Vào dự án Supabase của đơn vị → **SQL Editor** → dán và chạy **đúng thứ tự** 6 file trong thư mục `supabase/`:
+Vào dự án Supabase của đơn vị → **SQL Editor** → dán và chạy **đúng thứ tự** 7 file trong thư mục `supabase/`:
 
 | Thứ tự | File | Nội dung |
 |---|---|---|
@@ -16,8 +16,10 @@ Vào dự án Supabase của đơn vị → **SQL Editor** → dán và chạy *
 | 4 | `04_bao_mat.sql` | Phiên đăng nhập, khoá quyền ghi trực tiếp, hàm điểm danh trên máy chủ |
 | 5 | `05_hoi_nghi.sql` | Tạo hội nghị trước, chọn thành phần, **Bắt đầu / Kết thúc** điểm danh |
 | 6 | `06_ma_qr_dong.sql` | Mã QR có chữ ký máy chủ, đổi **3 giây/lần**, máy chủ kiểm tra từng lần quét |
+| 7 | `07_so_do_cho_ngoi.sql` | Sơ đồ chỗ ngồi, **Đối sánh sơ đồ chỗ ngồi**, đánh dấu nghi vấn |
 
-- Cả 6 file an toàn khi chạy lại. **Nếu chạy lại, luôn chạy đủ theo thứ tự.** Đặc biệt: đã chạy lại file 04 thì **bắt buộc chạy lại 05 và 06** ngay sau đó (nếu không, mã QR sẽ mất lớp kiểm tra chữ ký).
+- Cả 7 file an toàn khi chạy lại. **Nếu chạy lại, luôn chạy đủ theo thứ tự.** Đặc biệt: đã chạy lại file 04 thì **bắt buộc chạy lại 05 và 06** ngay sau đó (nếu không, mã QR sẽ mất lớp kiểm tra chữ ký).
+- Đơn vị đã chạy 01–06: chỉ cần chạy thêm **07_so_do_cho_ngoi.sql** (chạy lúc nào cũng được, không ảnh hưởng điểm danh đang diễn ra), rồi triển khai bản web mới.
 - Đơn vị đã chạy 01–05: chỉ cần chạy thêm **06_ma_qr_dong.sql**, rồi **triển khai bản web mới ngay** (bản web cũ không điểm danh được với máy chủ đã chạy 06 và ngược lại — không làm việc này trong lúc đang họp).
 - Đơn vị mới chạy 01–04: chạy thêm 05 rồi 06. Các phiên điểm danh cũ được giữ nguyên, tự xếp vào mục "Đã kết thúc".
 - Dữ liệu cũ được giữ nguyên; mật khẩu chữ thường đang có sẽ tự động được mã hoá.
@@ -25,7 +27,7 @@ Vào dự án Supabase của đơn vị → **SQL Editor** → dán và chạy *
 
 Phần mềm đã cài sẵn địa chỉ dự án Supabase của đơn vị (`DEFAULT_SUPABASE_URL` trong `App.tsx`), nên mọi máy tự kết nối, không phải nhập tay. Nếu đổi sang dự án khác: sửa 2 dòng `DEFAULT_SUPABASE_URL`, `DEFAULT_SUPABASE_KEY` rồi deploy lại.
 
-Kiểm tra: ở **màn hình đăng nhập**, bấm nút góc trên bên phải (**Đã kết nối**) → **Kiểm tra cơ sở dữ liệu** → phải báo "đầy đủ bảng và hàm nghiệp vụ (01–06)".
+Kiểm tra: ở **màn hình đăng nhập**, bấm nút góc trên bên phải (**Đã kết nối**) → **Kiểm tra cơ sở dữ liệu** → phải báo "đầy đủ bảng và hàm nghiệp vụ (01–07)".
 
 ## 2. Dịch vụ gửi email (bắt buộc nếu dùng đăng ký tài khoản / quên mật khẩu)
 
@@ -181,11 +183,36 @@ Mẹo cho phòng họp lớn:
 - Ngồi xa hơn khoảng 10 lần chiều rộng mã thì bấm 2× hoặc 4×.
 - Giảm độ sáng máy chiếu nếu mã bị loá trắng.
 
+## 8e. Đối sánh sơ đồ chỗ ngồi (chống gọi video nhờ quét hộ)
+
+**Chuẩn bị sơ đồ (làm 1 lần):** Điểm danh → Tạo hội nghị → bật **Đối sánh sơ đồ chỗ ngồi** → **Quản lý sơ đồ** → **Nhập từ Excel**.
+
+Tệp Excel theo mẫu `mau_so_do_cho_ngoi.xlsx`:
+- Mỗi ô là 1 ghế, ghi tên và tổ. Tổ đứng trước hay sau tên đều được: "Minh Quốc AN", "CSKV Viết Hiền". Chỉ huy ghi "Đ/c Hồng", "Đ/c N. Trung".
+- Cột giữa ghi số hàng 1, 2, 3… Hàng 1 là hàng sát bục chủ toạ. Dòng tiêu đề và mũi tên tự bỏ qua.
+- Mã tổ: AN (An ninh), CSKV, CSTT, PCTP, TH (Tổng hợp).
+
+Phần mềm tự ghép theo **tổ + tên**. Ô trùng tên hoặc không tìm thấy người thì hiện ở mục **Cần chọn đúng cán bộ**, chọn tay một lần rồi **Lưu sơ đồ**. Chạm vào ghế trên sơ đồ để sửa tên hoặc đổi người. Chưa có tệp Excel thì dùng **Tạo theo tổ**.
+
+**Khi họp:**
+- **Màn chiếu** (chạm vào mã QR để phóng to): mã QR cao hết màn hình bên trái, sơ đồ bên phải. Màu ghế:
+  - **xanh** = đã điểm danh;
+  - **đỏ** = chưa điểm danh;
+  - **vàng** = vắng có lý do (đã ghi ở Báo cáo vắng);
+  - **trắng** = không thuộc thành phần;
+  - **viền cam có dấu !** = nghi vấn.
+- **Chỉ huy đối sánh trên điện thoại:** mở hội nghị đang điểm danh → thẻ **Sơ đồ** → chạm ghế.
+  - Ghế xanh mà nhìn thấy trống thì bấm **Không thấy tại chỗ → Nghi vấn**.
+  - Thấy đúng người thì bấm **Có mặt đúng chỗ**.
+  - Phần mềm ghi lại người đánh dấu và thời gian. Cán bộ thường không tự gỡ được.
+- **Kết quả hội nghị** tách riêng mục **Nghi vấn** để chỉ huy xem xét.
+- Người trong thành phần chưa có ghế trên sơ đồ vẫn điểm danh bình thường, hiện ở danh sách "Chưa có chỗ".
+
 ## 9. Danh sách kiểm tra trước khi đưa vào sử dụng
 
 - [ ] Chạy đủ 6 file SQL theo thứ tự trên dự án Supabase của đơn vị (đã chạy 01–05 thì chạy thêm 06), triển khai bản web mới ngay sau đó.
 - [ ] Đăng nhập `admin` → **đổi mật khẩu ngay** (mật khẩu mặc định 123123 ai cũng biết).
-- [ ] Màn hình đăng nhập → nút **Đã kết nối** → Kiểm tra cơ sở dữ liệu → báo đầy đủ 01–06.
+- [ ] Màn hình đăng nhập → nút **Đã kết nối** → Kiểm tra cơ sở dữ liệu → báo đầy đủ 01–07.
 - [ ] Kiểm tra danh sách cán bộ, **điền email** cho từng người (cần cho quên mật khẩu).
 - [ ] Cấp quyền "Quản lý điểm danh" cho cán bộ trực tiếp tổ chức hội nghị (nếu không phải Trưởng/Phó).
 - [ ] Triển khai `Mailer.gs`, khai báo `mailer_url`, `mailer_key` (nếu dùng đăng ký/quên mật khẩu).

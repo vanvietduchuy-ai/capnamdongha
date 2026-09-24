@@ -2,16 +2,20 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { QRCodeSVG } from 'qrcode.react';
 import { MockDB } from '../services/mockDatabase';
 import {
-  AttendanceRecord, AttendanceSession, User, UserPermission, UserRole,
+  AttendanceRecord, AttendanceSession, AttendanceAbsence, Seat, SeatFlag, SeatLayout, User, UserPermission, UserRole,
   sessionState, sessionTime, SessionState
 } from '../types';
 import { ParticipantPicker } from './ParticipantPicker';
 import { Portal } from './Portal';
 import { SkeletonList, BumpNumber } from './UI';
+import { SeatMap, SeatLegend, PersonIcon } from './SeatMap';
+import { SeatingManager } from './SeatingManager';
+import { seatStateFactory, seatingStats } from '../lib/seating';
 import { guestUrl, officerPayload, signSlot } from '../lib/qrCode';
+import { LOGO_URL, ORG_NAME } from '../lib/brand';
 import {
   Plus, CalendarPlus, CalendarClock, Timer, MapPin, Users as UsersIcon, Play, Pencil, Trash2, QrCode, UserPlus, Square,
-  FileText, RotateCcw, X, ChevronLeft, ChevronRight, Maximize2, FileDown, Sheet as SheetIcon, CheckCircle2
+  FileText, RotateCcw, X, ChevronLeft, ChevronRight, Maximize2, FileDown, Sheet as SheetIcon, CheckCircle2, LayoutGrid, AlertTriangle
 } from 'lucide-react';
 
 interface Props { currentUser: User; }
@@ -60,7 +64,12 @@ export const MeetingManager: React.FC<Props> = ({ currentUser }) => {
   const [toast, setToast] = useState<string | null>(null);
 
   // Soạn / sửa hội nghị
-  const [editing, setEditing] = useState<null | { id?: string; title: string; when: string; location: string; ids: string[]; state: SessionState | 'NEW'; locked: string[] }>(null);
+  const [editing, setEditing] = useState<null | { id?: string; title: string; when: string; location: string; ids: string[]; state: SessionState | 'NEW'; locked: string[]; seatCompare: boolean; layoutId: string }>(null);
+  // Sơ đồ chỗ ngồi & đối sánh
+  const [layouts, setLayouts] = useState<SeatLayout[]>([]);
+  const [flags, setFlags] = useState<SeatFlag[]>([]);
+  const [absences, setAbsences] = useState<AttendanceAbsence[]>([]);
+  const [seatMgr, setSeatMgr] = useState<{ open: boolean; id?: string | null }>({ open: false });
   const [pickerOpen, setPickerOpen] = useState(false);
   // Bắt đầu
   const [starting, setStarting] = useState<AttendanceSession | null>(null);
@@ -82,7 +91,14 @@ export const MeetingManager: React.FC<Props> = ({ currentUser }) => {
       setAllUsers(us);
       setUsers(us.filter(u => u.role !== UserRole.ADMIN && (canSeeAll || u.department === currentUser.department)));
       const ids = list.filter(s => s.status !== 'DRAFT').map(s => s.id);
-      setRecords(ids.length ? await MockDB.getAttendanceRecordsForSessions(ids) : []);
+      const seatIds = list.filter(s => s.seatCompare && s.status !== 'DRAFT').map(s => s.id);
+      const [recs, lays, fl, ab] = await Promise.all([
+        ids.length ? MockDB.getAttendanceRecordsForSessions(ids) : Promise.resolve([]),
+        MockDB.getSeatLayouts(),
+        MockDB.getSeatFlags(seatIds),
+        MockDB.getAbsences(seatIds)
+      ]);
+      setRecords(recs); setLayouts(lays); setFlags(fl); setAbsences(ab);
     } catch (e) {
       console.error('Lỗi tải danh sách hội nghị', e);
     } finally {
@@ -145,12 +161,13 @@ export const MeetingManager: React.FC<Props> = ({ currentUser }) => {
   };
 
   // ---------------- Hành động ----------------
-  const openNew = () => setEditing({ title: '', when: '', location: '', ids: [], state: 'NEW', locked: [] });
+  const openNew = () => setEditing({ title: '', when: '', location: '', ids: [], state: 'NEW', locked: [], seatCompare: false, layoutId: layouts[0]?.id || '' });
   const openEdit = (s: AttendanceSession, pick = false) => {
     const st = sessionState(s, Date.now());
     setEditing({
       id: s.id, title: s.title, when: toLocalInput(s.scheduledAt), location: s.location || '',
-      ids: [...(s.expectedUserIds || [])], state: st, locked: st === 'OPEN' ? [...(s.expectedUserIds || [])] : []
+      ids: [...(s.expectedUserIds || [])], state: st, locked: st === 'OPEN' ? [...(s.expectedUserIds || [])] : [],
+      seatCompare: !!s.seatCompare, layoutId: s.seatLayoutId || layouts[0]?.id || ''
     });
     if (pick) setPickerOpen(true);
   };
@@ -158,12 +175,21 @@ export const MeetingManager: React.FC<Props> = ({ currentUser }) => {
   const saveEditing = async (thenStart = false) => {
     if (!editing) return;
     if (!editing.title.trim()) { showToast('Vui lòng nhập tên hội nghị.'); return; }
+    if (editing.seatCompare && !layouts.some(l => l.id === editing.layoutId)) { showToast('Chọn sơ đồ chỗ ngồi hoặc tắt "Đối sánh sơ đồ chỗ ngồi".'); return; }
     setBusy('save');
     const res = await MockDB.saveMeeting({
       id: editing.id, title: editing.title.trim(),
       scheduledAt: editing.when ? new Date(editing.when).getTime() : null,
       location: editing.location.trim(), expectedUserIds: editing.ids
     });
+    if (res.ok && res.session) {
+      const prev = meetings.find(m => m.id === res.session!.id);
+      if (!!prev?.seatCompare !== editing.seatCompare || (editing.seatCompare && prev?.seatLayoutId !== editing.layoutId) || (!prev && editing.seatCompare)) {
+        const r2 = await MockDB.setMeetingSeating(res.session.id, editing.layoutId || null, editing.seatCompare);
+        if (!r2.ok) { setBusy(null); showToast(r2.message || 'Không lưu được tuỳ chọn đối sánh sơ đồ.'); await load(); return; }
+        res.session = { ...res.session, seatCompare: editing.seatCompare, seatLayoutId: editing.layoutId || res.session.seatLayoutId };
+      }
+    }
     setBusy(null);
     if (!res.ok) { showToast(res.message || 'Không lưu được hội nghị.'); return; }
     setEditing(null);
@@ -396,8 +422,66 @@ export const MeetingManager: React.FC<Props> = ({ currentUser }) => {
             </div>
           )}
           {editing.state === 'OPEN' && <p className="mt-2 text-xs text-amber-800">Đang điểm danh: chỉ bổ sung thêm người, không bỏ bớt được.</p>}
+
+          {/* Đối sánh sơ đồ chỗ ngồi */}
+          {(() => {
+            const lay = layouts.find(l => l.id === editing.layoutId) || null;
+            const seated = new Set((lay?.seats || []).map(x => x.userId).filter(Boolean) as string[]);
+            const inSeat = editing.ids.filter(id => seated.has(id)).length;
+            const outside = (lay?.seats || []).filter(x => x.label && (!x.userId || !editing.ids.includes(x.userId))).length;
+            return (
+              <div className={`mt-4 rounded-xl border p-3.5 ${editing.seatCompare ? 'border-emerald-300 bg-emerald-50/40' : 'border-stone-200 bg-white'}`} data-testid="seat-compare-box">
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <span className="flex-1">
+                    <span className="block text-sm font-semibold text-stone-900">Đối sánh sơ đồ chỗ ngồi</span>
+                    <span className="block text-xs text-stone-500 mt-0.5">Màn chiếu hiện sơ đồ bên phải mã QR, ghế đổi màu khi cán bộ quét. Chỉ huy chạm ghế để đánh dấu nghi vấn.</span>
+                  </span>
+                  <input type="checkbox" role="switch" data-testid="seat-compare-toggle" checked={editing.seatCompare}
+                    onChange={e => setEditing({ ...editing, seatCompare: e.target.checked, layoutId: editing.layoutId || layouts[0]?.id || '' })}
+                    className="sr-only peer" />
+                  <span aria-hidden="true" className={`mt-0.5 w-11 h-6 rounded-full relative shrink-0 transition-colors ${editing.seatCompare ? 'bg-emerald-600' : 'bg-stone-300'}`}>
+                    <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all ${editing.seatCompare ? 'left-[22px]' : 'left-0.5'}`} />
+                  </span>
+                </label>
+                {editing.seatCompare && (
+                  <div className="mt-3 space-y-2.5">
+                    {layouts.length === 0 ? (
+                      <p className="text-[13px] text-amber-800">Chưa có sơ đồ nào. Bấm <b>Quản lý sơ đồ</b> để nhập từ tệp Excel.</p>
+                    ) : (
+                      <select value={editing.layoutId} onChange={e => setEditing({ ...editing, layoutId: e.target.value })} data-testid="seat-layout-select"
+                        className="w-full h-11 px-3 rounded-lg border border-stone-300 bg-white text-base md:text-sm">
+                        {layouts.map(l => <option key={l.id} value={l.id}>{l.name} · {l.seats.filter(x => x.label).length} ghế</option>)}
+                      </select>
+                    )}
+                    {lay && (
+                      <>
+                        <div className="flex flex-wrap gap-1.5">
+                          <span className={`text-[11.5px] font-semibold rounded-full px-2.5 py-0.5 ${inSeat === editing.ids.length ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`} data-testid="seat-match-chip">
+                            {inSeat === editing.ids.length ? '✓ ' : ''}Có chỗ ngồi {inSeat}/{editing.ids.length} thành phần
+                          </span>
+                          {outside > 0 && <span className="text-[11.5px] font-semibold rounded-full px-2.5 py-0.5 bg-stone-100 text-stone-600">{outside} ghế không thuộc thành phần</span>}
+                        </div>
+                        <div className="bg-white rounded-lg border border-stone-200 p-2">
+                          <SeatMap layout={lay} size="mini" stateOf={x => (!x.label ? 'empty' : x.userId && editing.ids.includes(x.userId) ? 'present' : 'outside')} />
+                        </div>
+                        {inSeat < editing.ids.length && <p className="text-[11.5px] text-amber-800">{editing.ids.length - inSeat} người trong thành phần chưa có ghế trên sơ đồ: vẫn điểm danh bình thường, hiện ở danh sách "Chưa có chỗ".</p>}
+                      </>
+                    )}
+                    <button type="button" onClick={() => setSeatMgr({ open: true, id: lay?.id })} data-testid="btn-seat-manager"
+                      className="w-full h-10 rounded-lg border border-stone-300 bg-white hover:bg-stone-50 text-[13px] font-semibold text-stone-700 inline-flex items-center justify-center gap-1.5">
+                      <LayoutGrid className="w-4 h-4" />{lay ? 'Xem, sửa chỗ ngồi' : 'Quản lý sơ đồ'}
+                    </button>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </Sheet>
       )}
+
+      <SeatingManager open={seatMgr.open} initialId={seatMgr.id} users={allUsers}
+        onClose={() => setSeatMgr({ open: false })}
+        onChanged={(ls, id) => { setLayouts(ls); if (editing && id) setEditing(e => (e ? { ...e, layoutId: id, seatCompare: true } : e)); }} />
 
       <ParticipantPicker
         open={pickerOpen}
@@ -436,6 +520,17 @@ export const MeetingManager: React.FC<Props> = ({ currentUser }) => {
       {liveSession && (
         <LivePanel
           session={liveSession} now={now} st={stats(liveSession)} userMap={userMap}
+          layout={liveSession.seatCompare ? layouts.find(l => l.id === liveSession.seatLayoutId) || null : null}
+          flags={flags.filter(f => f.sessionId === liveSession.id)}
+          absences={absences.filter(a => a.sessionId === liveSession.id)}
+          onFlag={async (uid, status) => {
+            const r = await MockDB.flagSeat(liveSession.id, uid, status);
+            if (!r.ok) { showToast(r.message || 'Không lưu được.'); return; }
+            setFlags(fs => {
+              const rest = fs.filter(f => !(f.sessionId === liveSession.id && f.userId === uid));
+              return status ? [...rest, { id: `${liveSession.id}__${uid}`, sessionId: liveSession.id, userId: uid, status, flaggedBy: currentUser.id, flaggedAt: Date.now() }] : rest;
+            });
+          }}
           onClose={() => setLiveId(null)} onEnd={() => doEnd(liveSession)} onExtend={m => doExtend(liveSession, m)}
           onAdd={() => { setLiveId(null); openEdit(liveSession, true); }} ending={busy === 'end'}
         />
@@ -478,6 +573,18 @@ export const MeetingManager: React.FC<Props> = ({ currentUser }) => {
                 })}
               </div>
             )}
+            {(() => {
+              const sus = flags.filter(f => f.sessionId === resultSession.id && f.status === 'SUSPECT');
+              if (!sus.length) return null;
+              return (<>
+                <h4 className="mt-5 mb-2 text-[13px] font-semibold text-orange-700 inline-flex items-center gap-1.5"><AlertTriangle className="w-4 h-4" />Nghi vấn: đã quét nhưng không thấy tại chỗ ({sus.length})</h4>
+                <div className="rounded-lg border border-orange-200 divide-y divide-orange-100 bg-orange-50/40" data-testid="result-suspects">
+                  {sus.map(f => { const u = userMap.get(f.userId); const by = f.flaggedBy ? userMap.get(f.flaggedBy)?.fullName : '';
+                    return <div key={f.id} className="px-3 py-2.5"><div className="text-sm font-medium text-stone-900">{u?.fullName || f.userId}</div>
+                      <div className="text-[11px] text-stone-500">{u?.department || ''}{by ? ` · đánh dấu bởi ${by}` : ''}{f.flaggedAt ? ` lúc ${fmtTime(f.flaggedAt)}` : ''}</div></div>; })}
+                </div>
+              </>);
+            })()}
             <p className="mt-3 text-xs text-stone-500">Ghi lý do vắng (có lý do / không lý do) ở thẻ <b>Báo cáo vắng</b> trước khi xuất báo cáo chính thức.</p>
             <button onClick={() => { setResultId(null); askStart(resultSession); }} className="mt-3 inline-flex items-center gap-1.5 text-[13px] font-medium text-stone-600 hover:text-stone-900"><RotateCcw className="w-3.5 h-3.5" />Mở lại điểm danh</button>
           </Sheet>
@@ -517,11 +624,16 @@ const LivePanel: React.FC<{
   session: AttendanceSession; now: number;
   st: { expected: string[]; recs: AttendanceRecord[]; present: string[]; absent: string[]; extra: AttendanceRecord[] };
   userMap: Map<string, User>;
+  layout: SeatLayout | null; flags: SeatFlag[]; absences: AttendanceAbsence[];
+  onFlag: (userId: string, status: 'SUSPECT' | 'CONFIRMED' | null) => Promise<void>;
   onClose: () => void; onEnd: () => void; onExtend: (m: number) => void; onAdd: () => void; ending: boolean;
-}> = ({ session, now, st, userMap, onClose, onEnd, onExtend, onAdd, ending }) => {
+}> = ({ session, now, st, userMap, layout, flags, absences, onFlag, onClose, onEnd, onExtend, onAdd, ending }) => {
   const [mode, setMode] = useState<'OFFICER' | 'GUEST'>('OFFICER');
   const [qr, setQr] = useState('');
-  const [tab, setTab] = useState<'ABSENT' | 'PRESENT'>('ABSENT');
+  const [tab, setTab] = useState<'ABSENT' | 'PRESENT' | 'SEATS'>(layout ? 'SEATS' : 'ABSENT');
+  const [pickSeat, setPickSeat] = useState<Seat | null>(null);
+  const seatState = useMemo(() => seatStateFactory(session, st.recs, absences, flags), [session, st.recs, absences, flags]);
+  const sStats = useMemo(() => seatingStats(session, layout, st.recs, absences, flags), [session, layout, st.recs, absences, flags]);
   const [big, setBig] = useState(false);
 
   // Mã QR có chữ ký máy chủ, đổi mỗi 3 giây (chống chụp ảnh gửi cho người vắng, chống tự tạo mã)
@@ -590,20 +702,68 @@ const LivePanel: React.FC<{
     </div>
   );
 
+  const ring = (w: number) => (
+    <svg className="absolute pointer-events-none" style={{ inset: -w / 2, width: `calc(100% + ${w}px)`, height: `calc(100% + ${w}px)`, overflow: 'visible' }} aria-hidden="true">
+      <rect x="0" y="0" width="100%" height="100%" rx="18" ry="18" fill="none" stroke="#e5e7eb" strokeWidth={w} />
+      <rect x="0" y="0" width="100%" height="100%" rx="18" ry="18" fill="none" stroke="#b91c1c" strokeWidth={w} strokeLinecap="round" pathLength={100}
+        strokeDasharray="100" strokeDashoffset={100 - slotInfo.left * 100} style={{ transition: 'stroke-dashoffset .2s linear' }} />
+    </svg>
+  );
+  const bigQr = ready
+    ? <div key={qr} className="qr-swap w-full h-full"><QRCodeSVG value={qr} style={{ width: '100%', height: '100%', display: 'block' }} size={1024} level={mode === 'GUEST' ? 'M' : 'L'} /></div>
+    : <div className="w-full h-full flex items-center justify-center text-stone-500 text-center">{keyErr || 'Đang tạo mã...'}</div>;
+
+  if (big && layout && mode === 'OFFICER') {
+    // Màn chiếu có đối sánh: mã QR to hết chiều cao bên trái, sơ đồ chỗ ngồi bên phải
+    return (
+      <Portal><div className="fixed inset-0 z-[130] bg-[#eef0f4] flex gap-4 p-4" data-testid="projector-seat">
+        <button onClick={() => setBig(false)} aria-label="Thu nhỏ" className="relative shrink-0 bg-white rounded-2xl shadow-md"
+          style={{ height: 'calc(100vh - 2rem)', width: 'min(calc(100vh - 2rem), 58vw)', padding: 'clamp(16px, 3vh, 34px)' }} data-testid="projector-qr">
+          <div className="relative w-full h-full">{ready && ring(8)}{bigQr}</div>
+        </button>
+        <div className="flex-1 min-w-0 bg-white rounded-2xl shadow-md p-4 flex flex-col">
+          <div className="flex items-center gap-3">
+            <img src={LOGO_URL} alt="" className="w-11 h-11 object-contain" />
+            <div className="min-w-0 flex-1"><div className="text-[11px] font-bold tracking-wide text-stone-500 truncate">{ORG_NAME.toUpperCase()}</div>
+              <div className="text-lg xl:text-xl font-extrabold text-stone-900 truncate">{session.title}</div></div>
+            <div className="text-right shrink-0"><div className="text-2xl font-extrabold tabular leading-none">{fmtTime(now)}</div>
+              <div className="text-xs font-semibold text-emerald-700 mt-1">● Đang điểm danh · còn {fmtRemain(remain)}</div></div>
+          </div>
+          <div className="mt-3 rounded-xl bg-red-50 border border-red-200 text-red-900 text-[13px] xl:text-[15px] font-semibold px-3 py-2">
+            Phần mềm → <b className="text-brand-700">Điểm danh</b> → <b className="text-brand-700">Bắt đầu quét</b>. Mã đổi sau <b className="text-brand-700">{Math.max(1, Math.ceil(slotInfo.left * (key?.step || 3000) / 1000))}</b> giây. Ngồi xa bấm <b className="text-brand-700">2×</b> / <b className="text-brand-700">4×</b>.
+          </div>
+          <div className="grid grid-cols-4 gap-2 mt-2.5 text-center">
+            {[['Có mặt', sStats.present + sStats.suspect, 'text-emerald-700'], ['Chưa điểm danh', sStats.absent, 'text-red-700'], ['Vắng có lý do', sStats.excused, 'text-amber-700'], ['Nghi vấn', sStats.suspect, 'text-orange-600']].map(([l, n, c]) => (
+              <div key={l as string} className="rounded-xl border border-stone-200 py-1.5"><div className={`text-2xl xl:text-3xl font-extrabold tabular leading-tight ${c}`}><BumpNumber value={n as number} /></div><div className="text-[11px] xl:text-xs font-semibold text-stone-500">{l}</div></div>
+            ))}
+          </div>
+          <div className="h-2 rounded-full bg-stone-200 overflow-hidden mt-2"><div className="h-full rounded-full bg-emerald-500" style={{ width: `${st.expected.length ? (st.present.length * 100 / st.expected.length) : 0}%`, transition: 'width .5s' }} /></div>
+          <div className="flex items-center gap-2 mt-3 mb-1.5">
+            <span className="text-sm xl:text-base font-extrabold">SƠ ĐỒ CHỖ NGỒI</span>
+            <span className="text-[10px] font-extrabold text-white bg-brand-700 rounded-full px-2 py-0.5">ĐỐI SÁNH</span>
+            <span className="ml-auto text-[10px] font-extrabold tracking-[.18em] text-stone-500 bg-stone-100 rounded px-2 py-0.5">BỤC CHỦ TOẠ ▲</span>
+          </div>
+          <div className="flex-1 min-h-0"><SeatMap layout={layout} size="big" stateOf={seatState} /></div>
+          <div className="flex items-center gap-3 mt-2">
+            <SeatLegend compact className="flex-1" />
+            {sStats.unseated.length > 0 && <span className="text-[11px] text-stone-500 shrink-0">{sStats.unseated.length} người chưa có chỗ</span>}
+          </div>
+        </div>
+      </div></Portal>
+    );
+  }
+
   if (big) {
     return (
-      <Portal><div className="fixed inset-0 z-[130] bg-white flex flex-col items-center justify-center p-4" onClick={() => setBig(false)}>
-        <div className="text-center mb-4">
-          <div className="text-xl md:text-3xl font-semibold text-stone-900">{session.title}</div>
-          <div className="text-sm md:text-lg text-stone-500 mt-1">{mode === 'GUEST' ? 'Khách mời: quét bằng camera điện thoại' : 'Cán bộ: quét bằng ứng dụng'} · còn {fmtRemain(remain)}</div>
+      <Portal><div className="fixed inset-0 z-[130] bg-white flex flex-col items-center justify-center p-3" onClick={() => setBig(false)}>
+        <div className="text-center mb-2 shrink-0">
+          <div className="text-lg md:text-2xl font-semibold text-stone-900">{session.title}</div>
+          <div className="text-sm md:text-base text-stone-500">{mode === 'GUEST' ? 'Khách mời: quét bằng camera điện thoại' : 'Cán bộ: quét bằng ứng dụng'} · còn {fmtRemain(remain)} · <b className="text-emerald-700 tabular">{st.present.length}/{st.expected.length}</b></div>
         </div>
-        <div className="bg-white p-4 rounded-xl border border-stone-100 shadow" style={{ width: 'min(92vw, 80vh)' }}>
-          {ready
-            ? <QRCodeSVG value={qr} style={{ width: '100%', height: 'auto' }} size={640} level={mode === 'GUEST' ? 'M' : 'L'} />
-            : <div className="aspect-square flex items-center justify-center text-stone-500">{keyErr || 'Đang tạo mã...'}</div>}
+        <div className="relative bg-white rounded-xl" style={{ width: 'min(96vw, calc(100vh - 6rem))', height: 'min(96vw, calc(100vh - 6rem))', padding: 'clamp(10px, 2vh, 24px)' }}>
+          {ready && ring(8)}{bigQr}
         </div>
-        <div className="mt-4 text-2xl md:text-4xl font-semibold text-emerald-700 tabular">{st.present.length}<span className="text-stone-400">/{st.expected.length}</span></div>
-        <div className="text-xs text-stone-400 mt-2">Chạm để thu nhỏ</div>
+        <div className="text-xs text-stone-400 mt-1.5">Chạm để thu nhỏ</div>
       </div></Portal>
     );
   }
@@ -632,7 +792,7 @@ const LivePanel: React.FC<{
             <div className="grid grid-cols-3 gap-2 mt-3 text-center">
               <Stat n={st.present.length} label="Có mặt" cls="text-emerald-700" />
               <Stat n={st.absent.length} label="Chưa điểm danh" cls="text-red-700" />
-              <Stat n={`${rate}%`} label="Tỷ lệ" cls="text-stone-900" />
+              {layout ? <Stat n={sStats.suspect} label="Nghi vấn" cls="text-orange-600" /> : <Stat n={`${rate}%`} label="Tỷ lệ" cls="text-stone-900" />}
             </div>
             <div className="h-2 rounded-full bg-stone-200 overflow-hidden mt-2.5" role="progressbar" aria-valuenow={rate} aria-valuemin={0} aria-valuemax={100}>
               <div className="h-full rounded-full bg-emerald-500" style={{ width: `${rate}%`, transition: 'width .5s cubic-bezier(.2,.8,.2,1)' }} />
@@ -667,9 +827,30 @@ const LivePanel: React.FC<{
               </div>
             )}
             <div className="flex bg-stone-200/60 rounded-lg p-1 mb-2">
+              {layout && <button onClick={() => setTab('SEATS')} data-testid="tab-seats" className={`flex-1 h-8 text-[13px] rounded-md ${tab === 'SEATS' ? 'bg-white text-stone-900 font-semibold shadow-sm' : 'text-stone-600'}`}>Sơ đồ</button>}
               <button onClick={() => setTab('ABSENT')} className={`flex-1 h-8 text-[13px] rounded-md ${tab === 'ABSENT' ? 'bg-white text-stone-900 font-semibold shadow-sm' : 'text-stone-600'}`}>Chưa điểm danh ({st.absent.length})</button>
               <button onClick={() => setTab('PRESENT')} className={`flex-1 h-8 text-[13px] rounded-md ${tab === 'PRESENT' ? 'bg-white text-stone-900 font-semibold shadow-sm' : 'text-stone-600'}`}>Đã điểm danh ({st.recs.length})</button>
             </div>
+            {tab === 'SEATS' && layout ? (
+              <div className="bg-white rounded-xl border border-stone-200 p-2.5" data-testid="live-seats">
+                <div className="flex items-center justify-between mb-2 px-0.5">
+                  <span className="text-xs text-stone-500">Chạm ghế để đối sánh tại chỗ</span>
+                  <span className="text-[10px] font-bold tracking-[.18em] text-stone-500 bg-stone-100 rounded px-2 py-0.5">BỤC CHỦ TOẠ ▲</span>
+                </div>
+                <div className="overflow-x-auto -mx-1 px-1"><div style={{ minWidth: (layout.leftCols + layout.rightCols) * 30 }}>
+                  <div className="md:hidden"><SeatMap layout={layout} size="mini" stateOf={seatState} onSeat={x => x.userId && setPickSeat(x)} selected={pickSeat} /></div>
+                  <div className="hidden md:block"><SeatMap layout={layout} size="normal" stateOf={seatState} onSeat={x => x.userId && setPickSeat(x)} selected={pickSeat} /></div>
+                </div></div>
+                <SeatLegend compact className="mt-2.5" />
+                {sStats.unseated.length > 0 && (
+                  <div className="mt-3 pt-2.5 border-t border-stone-100">
+                    <div className="text-xs font-semibold text-stone-600 mb-1.5">Chưa có chỗ trên sơ đồ ({sStats.unseated.length})</div>
+                    <div className="flex flex-wrap gap-1.5">{sStats.unseated.map(id => (
+                      <span key={id} className={`text-xs px-2 py-0.5 rounded-md ${st.present.includes(id) ? 'bg-emerald-50 text-emerald-800' : 'bg-red-50 text-red-800'}`}>{userMap.get(id)?.fullName || id}</span>))}</div>
+                  </div>
+                )}
+              </div>
+            ) : (
             <div className="bg-white rounded-xl border border-stone-200 divide-y divide-stone-100">
               {tab === 'ABSENT' && (st.absent.length === 0
                 ? <p className="text-center text-sm text-emerald-700 py-8">Đã đủ thành phần.</p>
@@ -701,10 +882,45 @@ const LivePanel: React.FC<{
                     </div>
                   );
                 }))}
-            </div>
+            </div>)}
           </div>
         </div>
       </div>
+
+      {pickSeat && pickSeat.userId && (() => {
+        const uid = pickSeat.userId;
+        const u = userMap.get(uid);
+        const rec = st.recs.find(r => r.userId === uid && !r.guestName);
+        const flag = flags.find(f => f.userId === uid);
+        const stt = seatState(pickSeat);
+        const label: Record<string, string> = { present: 'Đã điểm danh', absent: 'Chưa điểm danh', excused: 'Vắng có lý do', outside: 'Không thuộc thành phần', suspect: 'Nghi vấn', empty: '' };
+        const tone: Record<string, string> = { present: 'bg-emerald-50 text-emerald-800', absent: 'bg-red-50 text-red-800', excused: 'bg-amber-50 text-amber-800', outside: 'bg-stone-100 text-stone-600', suspect: 'bg-orange-100 text-orange-800', empty: '' };
+        const act = async (status: 'SUSPECT' | 'CONFIRMED' | null) => { await onFlag(uid, status); setPickSeat(null); };
+        return (
+          <Sheet title={`Hàng ${pickSeat.r + 1} · ghế ${pickSeat.c + 1}`} onClose={() => setPickSeat(null)}>
+            <div className="flex items-center gap-3" data-testid="seat-sheet">
+              <PersonIcon className="w-10 h-10 shrink-0" fill={stt === 'absent' ? '#dc2626' : stt === 'excused' ? '#f59e0b' : stt === 'outside' ? '#9ca3af' : '#16a34a'} />
+              <div className="min-w-0 flex-1">
+                <div className="font-semibold text-stone-900 truncate">{u?.fullName || pickSeat.label}</div>
+                <div className="text-xs text-stone-500 truncate">{u?.department || pickSeat.team || ''}{u?.position ? ` · ${u.position}` : ''}</div>
+              </div>
+              <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full shrink-0 ${tone[stt]}`}>{label[stt]}</span>
+            </div>
+            <div className="mt-3 rounded-lg bg-stone-50 px-3 py-2.5 text-[13px] text-stone-700 leading-relaxed">
+              {rec ? <>Đã quét lúc <b>{fmtTime(rec.timestamp)}</b>. Nhìn ghế thực tế để đối sánh:</> : stt === 'outside' ? 'Người này không thuộc thành phần hội nghị.' : 'Chưa quét mã điểm danh.'}
+              {flag && <div className="mt-1 text-xs text-stone-500">{flag.status === 'SUSPECT' ? 'Đã đánh dấu nghi vấn' : 'Đã xác nhận có mặt đúng chỗ'}{flag.flaggedBy ? ` bởi ${userMap.get(flag.flaggedBy)?.fullName || ''}` : ''}{flag.flaggedAt ? ` lúc ${fmtTime(flag.flaggedAt)}` : ''}.</div>}
+            </div>
+            {rec && (
+              <div className="mt-3 space-y-2">
+                <button onClick={() => act('CONFIRMED')} data-testid="btn-seat-ok" className="w-full h-11 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-semibold inline-flex items-center justify-center gap-1.5"><CheckCircle2 className="w-4 h-4" />Có mặt đúng chỗ</button>
+                <button onClick={() => act('SUSPECT')} data-testid="btn-seat-suspect" className="w-full h-11 rounded-lg bg-orange-600 hover:bg-orange-700 text-white text-sm font-semibold inline-flex items-center justify-center gap-1.5"><AlertTriangle className="w-4 h-4" />Không thấy tại chỗ → Nghi vấn</button>
+                {flag && <button onClick={() => act(null)} className="w-full h-10 rounded-lg text-sm font-medium text-stone-600 hover:bg-stone-100">Bỏ đánh dấu</button>}
+                <p className="text-[11px] text-stone-500 text-center">Phần mềm ghi lại người đánh dấu. Người nghi vấn được tách riêng ở kết quả hội nghị.</p>
+              </div>
+            )}
+          </Sheet>
+        );
+      })()}
 
       <div className="bg-white border-t border-stone-200 p-3" style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}>
         <div className="max-w-4xl mx-auto">

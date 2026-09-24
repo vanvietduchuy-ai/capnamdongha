@@ -91,6 +91,38 @@ export interface AttendanceSession {
   location?: string | null;    // Địa điểm
   startedAt?: number | null;   // Lúc bắt đầu điểm danh
   endedAt?: number | null;     // Lúc kết thúc điểm danh
+  seatLayoutId?: string | null; // Sơ đồ chỗ ngồi dùng cho hội nghị
+  seatCompare?: boolean | null; // Bật "Đối sánh sơ đồ chỗ ngồi"
+}
+
+/** Một ghế trong sơ đồ: r = hàng (0 = sát bục), c = cột (0..leftCols+rightCols-1) */
+export interface Seat {
+  r: number;
+  c: number;
+  label: string;          // tên ghi trên sơ đồ (VD "Minh Quốc", "Đ/c Hồng")
+  team?: string;          // tổ ghi trên sơ đồ (VD "CSKV")
+  userId?: string | null; // cán bộ đã gắn với ghế
+}
+
+export interface SeatLayout {
+  id: string;
+  name: string;
+  rows: number;
+  leftCols: number;
+  rightCols: number;
+  seats: Seat[];
+  updatedAt?: number;
+  updatedBy?: string;
+}
+
+/** Đối sánh tại chỗ: SUSPECT = đã quét nhưng không thấy ngồi tại ghế; CONFIRMED = xác nhận có mặt đúng chỗ */
+export interface SeatFlag {
+  id: string;
+  sessionId: string;
+  userId: string;
+  status: 'SUSPECT' | 'CONFIRMED';
+  flaggedBy?: string;
+  flaggedAt?: number;
 }
 
 export type SessionState = 'DRAFT' | 'OPEN' | 'CLOSED';

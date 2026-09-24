@@ -38,6 +38,7 @@ Cơ sở dữ liệu: 6 file SQL trong thư mục `supabase/` (chạy theo thứ
 | `supabase/04_bao_mat.sql` | Phiên đăng nhập, hàm ghi dữ liệu trên máy chủ, khoá quyền ghi trực tiếp |
 | `supabase/05_hoi_nghi.sql` | Hội nghị: tạo trước, chọn thành phần, Bắt đầu / Kết thúc điểm danh |
 | `supabase/06_ma_qr_dong.sql` | Mã QR có chữ ký máy chủ, đổi 3 giây/lần |
+| `supabase/07_so_do_cho_ngoi.sql` | Sơ đồ chỗ ngồi, đối sánh khi điểm danh, đánh dấu nghi vấn |
 | `supabase/dat_lai_mat_khau_123123.sql` | Đặt lại mật khẩu mọi tài khoản về 123123 (chạy khi cần) |
 | `lib/brand.ts` | Tên đơn vị, đường dẫn logo |
 | `index.css` | Bộ quy chuẩn giao diện: màu, bo góc, bóng, chữ |
