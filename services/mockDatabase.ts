@@ -1,4 +1,4 @@
-import { User, UserRole, UserDepartment, Task, TaskStatus, TaskPriority, RecurringType, AppNotification, Utility, CalendarEvent, AttendanceRecord, AttendanceSession, AttendanceAbsence } from '../types';
+import { User, UserRole, UserDepartment, Task, TaskStatus, TaskPriority, RecurringType, AppNotification, Utility, CalendarEvent, AttendanceRecord, AttendanceSession, AttendanceAbsence, sessionState, sessionTime } from '../types';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { buildClient, setClientConfig, getClient, CloudConfig as StoredCloudConfig, callRpc, getSessionToken, setSessionToken } from '../lib/supabase';
 import { EmailService } from './emailService';
@@ -276,7 +276,16 @@ export const MockDB = {
      if (touch.error) {
        return { ok: false, message: 'Chưa cài lớp bảo mật. Hãy chạy file supabase/04_bao_mat.sql.' };
      }
-     return { ok: true, message: 'Cơ sở dữ liệu đã đầy đủ bảng và hàm nghiệp vụ (01–04).' };
+     const meet = await client.rpc('app_start_session', { p_token: 'kiem-tra-cai-dat-000000000000', p_id: '__kiem_tra__', p_auto_end_minutes: 30 });
+     const col = await client.from('attendance_sessions').select('status').limit(1);
+     if (meet.error || col.error) {
+       return { ok: false, message: 'Chưa cài chức năng Bắt đầu/Kết thúc hội nghị. Hãy chạy file supabase/05_hoi_nghi.sql.' };
+     }
+     const qr = await client.rpc('app_qr_key', { p_token: 'kiem-tra-cai-dat-000000000000', p_session_id: '__kiem_tra__' });
+     if (qr.error) {
+       return { ok: false, message: 'Chưa cài mã QR động có chữ ký. Hãy chạy file supabase/06_ma_qr_dong.sql.' };
+     }
+     return { ok: true, message: 'Cơ sở dữ liệu đã đầy đủ bảng và hàm nghiệp vụ (01–06).' };
   },
 
   subscribe: (callback: (table?: string) => void) => {
@@ -974,6 +983,10 @@ export const MockDB = {
     const index = allSessions.findIndex(s => s.id === sessionId);
     if (index !== -1) {
         allSessions[index].isActive = false;
+        if (allSessions[index].status !== 'DRAFT') {
+            allSessions[index].status = 'CLOSED';
+            allSessions[index].endedAt = Date.now();
+        }
         localStorage.setItem('attendance_sessions', JSON.stringify(allSessions));
     }
   },
@@ -996,15 +1009,17 @@ export const MockDB = {
     }
   },
 
-  checkIn: async (userId: string, deviceId: string, sessionId: string, ipAddress?: string, fingerprint?: string): Promise<{ success: boolean; message: string }> => {
+  checkIn: async (userId: string, deviceId: string, sessionId: string, ipAddress?: string, fingerprint?: string, qrText?: string): Promise<{ success: boolean; message: string }> => {
     if (supabase) {
-        // Máy chủ tự xác định người điểm danh theo phiên đăng nhập -> không thể điểm danh hộ
+        // Máy chủ tự xác định người điểm danh theo phiên đăng nhập -> không thể điểm danh hộ;
+        // nội dung mã QR được máy chủ kiểm tra chữ ký + độ mới (đổi 3 giây/lần)
         const res = await callRpc<{ title: string }>('app_check_in', {
             p_token: getSessionToken(),
             p_session_id: sessionId,
             p_device_id: deviceId,
             p_ip: ipAddress || null,
-            p_fingerprint: fingerprint || null
+            p_fingerprint: fingerprint || null,
+            p_qr: qrText || null
         });
         return res.ok
             ? { success: true, message: 'Điểm danh thành công!' }
@@ -1084,7 +1099,32 @@ export const MockDB = {
     return { success: true, message: 'Điểm danh thành công!' };
   },
 
-  guestCheckIn: async (guestName: string, guestUnit: string, guestPhone: string, deviceId: string, sessionId: string, ipAddress?: string, fingerprint?: string): Promise<{ success: boolean; message: string }> => {
+  // Mã QR động: người quản lý lấy khoá ký của hội nghị (kèm giờ máy chủ để bù lệch đồng hồ)
+  getQrKey: async (sessionId: string): Promise<{ ok: boolean; message?: string; secret?: string; offset?: number; stepMs?: number }> => {
+      if (supabase) {
+          const t0 = Date.now();
+          const res = await callRpc<{ secret: string; serverNow: number; stepMs: number }>('app_qr_key', {
+              p_token: getSessionToken(), p_session_id: sessionId
+          });
+          if (!res.ok) return { ok: false, message: res.message };
+          const t1 = Date.now();
+          return { ok: true, secret: res.secret, stepMs: res.stepMs || 3000, offset: Number(res.serverNow) - Math.round((t0 + t1) / 2) };
+      }
+      return { ok: true, secret: `local-${sessionId}`, stepMs: 3000, offset: 0 };
+  },
+
+  // Khách mời: đổi mã QR vừa quét lấy "vé" có hạn để điền biểu mẫu
+  getGuestTicket: async (sessionId: string, slot: number, code: string): Promise<{ ok: boolean; message?: string; ticket?: string; title?: string }> => {
+      if (supabase) {
+          const res = await callRpc<{ ticket: string; title: string }>('app_guest_ticket', {
+              p_session_id: sessionId, p_slot: slot, p_code: code
+          });
+          return res.ok ? { ok: true, ticket: res.ticket, title: res.title } : { ok: false, message: res.message };
+      }
+      return { ok: true, ticket: 'local' };
+  },
+
+  guestCheckIn: async (guestName: string, guestUnit: string, guestPhone: string, deviceId: string, sessionId: string, ipAddress?: string, ticket?: string): Promise<{ success: boolean; message: string }> => {
       if (supabase) {
           const res = await callRpc('app_guest_check_in', {
               p_session_id: sessionId,
@@ -1092,7 +1132,8 @@ export const MockDB = {
               p_unit: guestUnit,
               p_phone: guestPhone,
               p_device_id: deviceId,
-              p_ip: ipAddress || null
+              p_ip: ipAddress || null,
+              p_ticket: ticket || null
           });
           return res.ok
               ? { success: true, message: 'Điểm danh khách mời thành công!' }
@@ -1125,7 +1166,7 @@ export const MockDB = {
           timestamp: Date.now(),
           date: today,
           deviceId,
-          fingerprint,
+          fingerprint: undefined,
           ipAddress,
           status: 'PRESENT',
           // Store extra guest info in a way that can be retrieved later if needed
@@ -1171,14 +1212,107 @@ export const MockDB = {
       }
   },
 
+  // --- HỘI NGHỊ: TẠO TRƯỚC → CHỌN THÀNH PHẦN → BẮT ĐẦU → KẾT THÚC ---
+
+  // Danh sách hội nghị cho màn hình quản lý: mọi hội nghị chưa bắt đầu / đang điểm danh
+  // + các hội nghị tạo trong 60 ngày gần nhất
+  getMeetings: async (): Promise<AttendanceSession[]> => {
+      const since = Date.now() - 60 * 24 * 3600 * 1000;
+      let list: AttendanceSession[] = [];
+      if (supabase) {
+          const { data, error } = await supabase.from('attendance_sessions')
+              .select('*')
+              .or(`status.eq.DRAFT,status.eq.OPEN,createdAt.gte.${since}`)
+              .order('createdAt', { ascending: false })
+              .limit(300);
+          if (error) console.error('Lỗi đọc danh sách hội nghị:', error);
+          list = (data as AttendanceSession[]) || [];
+      } else {
+          const stored = localStorage.getItem('attendance_sessions');
+          list = (stored ? JSON.parse(stored) : []) as AttendanceSession[];
+          list = list.filter(s => s.status === 'DRAFT' || s.status === 'OPEN' || s.createdAt >= since)
+                     .sort((a, b) => b.createdAt - a.createdAt);
+      }
+      return list.map(s => ({ ...s, expectedUserIds: Array.isArray(s.expectedUserIds) ? s.expectedUserIds : [] }));
+  },
+
+  saveMeeting: async (m: { id?: string; title: string; scheduledAt?: number | null; location?: string; expectedUserIds: string[] }):
+      Promise<{ ok: boolean; message?: string; note?: string; session?: AttendanceSession }> => {
+      if (supabase) {
+          const res = await callRpc<{ session: AttendanceSession; note?: string }>('app_save_meeting', {
+              p_token: getSessionToken(),
+              p_id: m.id || null,
+              p_title: m.title,
+              p_scheduled_at: m.scheduledAt ?? null,
+              p_location: m.location || '',
+              p_expected: m.expectedUserIds
+          });
+          if (!res.ok) return { ok: false, message: res.message };
+          return { ok: true, note: (res as any).note || undefined, session: (res as any).session };
+      }
+      // Chế độ cục bộ
+      const stored = localStorage.getItem('attendance_sessions');
+      const all: AttendanceSession[] = stored ? JSON.parse(stored) : [];
+      if (!m.title.trim()) return { ok: false, message: 'Vui lòng nhập tên hội nghị.' };
+      let s = m.id ? all.find(x => x.id === m.id) : undefined;
+      if (!s) {
+          s = {
+              id: `sess_${Date.now()}`, title: m.title.trim(), creatorId: '', createdAt: Date.now(),
+              expiresAt: 0, isActive: false, expectedUserIds: [...new Set(m.expectedUserIds)],
+              status: 'DRAFT', scheduledAt: m.scheduledAt ?? null, location: m.location || null
+          };
+          all.push(s);
+      } else {
+          const st = sessionState(s);
+          s.title = m.title.trim();
+          s.location = m.location || null;
+          if (st === 'DRAFT') { s.scheduledAt = m.scheduledAt ?? null; s.expectedUserIds = [...new Set(m.expectedUserIds)]; }
+          else if (st === 'OPEN') s.expectedUserIds = [...new Set([...s.expectedUserIds, ...m.expectedUserIds])];
+      }
+      localStorage.setItem('attendance_sessions', JSON.stringify(all));
+      return { ok: true, session: s };
+  },
+
+  startMeeting: async (id: string, autoEndMinutes: number): Promise<{ ok: boolean; message?: string; session?: AttendanceSession }> => {
+      if (supabase) {
+          const res = await callRpc<{ session: AttendanceSession }>('app_start_session', {
+              p_token: getSessionToken(), p_id: id, p_auto_end_minutes: autoEndMinutes
+          });
+          return res.ok ? { ok: true, session: (res as any).session } : { ok: false, message: res.message };
+      }
+      const stored = localStorage.getItem('attendance_sessions');
+      const all: AttendanceSession[] = stored ? JSON.parse(stored) : [];
+      const s = all.find(x => x.id === id);
+      if (!s) return { ok: false, message: 'Không tìm thấy hội nghị.' };
+      if (!s.expectedUserIds.length) return { ok: false, message: 'Chưa chọn thành phần tham dự.' };
+      s.status = 'OPEN'; s.isActive = true; s.startedAt = s.startedAt || Date.now(); s.endedAt = null;
+      s.expiresAt = Date.now() + autoEndMinutes * 60000;
+      localStorage.setItem('attendance_sessions', JSON.stringify(all));
+      return { ok: true, session: s };
+  },
+
+  deleteMeeting: async (id: string): Promise<{ ok: boolean; message?: string }> => {
+      if (supabase) {
+          const res = await callRpc('app_delete_meeting', { p_token: getSessionToken(), p_id: id });
+          return res.ok ? { ok: true } : { ok: false, message: res.message };
+      }
+      const stored = localStorage.getItem('attendance_sessions');
+      const all: AttendanceSession[] = stored ? JSON.parse(stored) : [];
+      localStorage.setItem('attendance_sessions', JSON.stringify(all.filter(s => s.id !== id || s.status !== 'DRAFT')));
+      return { ok: true };
+  },
+
   // --- LỊCH SỬ PHIÊN ĐIỂM DANH & LÝ DO VẮNG MẶT (phục vụ báo cáo) ---
 
   // Tất cả phiên điểm danh trong khoảng thời gian (theo thời điểm tạo phiên)
   getAttendanceSessions: async (fromMs?: number, toMs?: number): Promise<AttendanceSession[]> => {
+      // Hội nghị có thể tạo trước nhiều ngày rồi mới bắt đầu -> lấy rộng theo ngày tạo,
+      // sau đó lọc chính xác theo thời điểm bắt đầu điểm danh
+      const createdFrom = fromMs !== undefined ? fromMs - 90 * 24 * 3600 * 1000 : undefined;
       let sessions: AttendanceSession[] = [];
       if (supabase) {
           let q = supabase.from('attendance_sessions').select('*');
-          if (fromMs !== undefined) q = q.gte('createdAt', fromMs);
+          if (createdFrom !== undefined) q = q.gte('createdAt', createdFrom);
           if (toMs !== undefined) q = q.lte('createdAt', toMs);
           const { data, error } = await q.order('createdAt', { ascending: false });
           if (error) console.error('Lỗi đọc lịch sử phiên điểm danh:', error);
@@ -1186,14 +1320,15 @@ export const MockDB = {
       } else {
           const stored = localStorage.getItem('attendance_sessions');
           sessions = stored ? JSON.parse(stored) : [];
-          sessions = sessions
-              .filter(s => (fromMs === undefined || s.createdAt >= fromMs) && (toMs === undefined || s.createdAt <= toMs))
-              .sort((a, b) => b.createdAt - a.createdAt);
       }
-      return sessions.map(s => ({
-          ...s,
-          expectedUserIds: Array.isArray(s.expectedUserIds) ? s.expectedUserIds : []
-      }));
+      return sessions
+          .map(s => ({ ...s, expectedUserIds: Array.isArray(s.expectedUserIds) ? s.expectedUserIds : [] }))
+          .filter(s => sessionState(s) !== 'DRAFT')
+          .filter(s => {
+              const t = sessionTime(s);
+              return (fromMs === undefined || t >= fromMs) && (toMs === undefined || t <= toMs);
+          })
+          .sort((a, b) => sessionTime(b) - sessionTime(a));
   },
 
   // Bản ghi điểm danh của nhiều phiên cùng lúc

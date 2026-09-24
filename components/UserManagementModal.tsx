@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { Bell } from 'lucide-react';
 import { User, UserRole, UserDepartment, UserPermission } from '../types';
-import { Button, Input, Select } from './UI';
+import { Button, Input, Select, Avatar } from './UI';
 import { MockDB } from '../services/mockDatabase';
 import { GoogleGenAI } from "@google/genai";
 
@@ -384,7 +385,7 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
                                       <span className="font-bold text-stone-800">{u.fullName}</span>
                                       <span className={`text-stone-500 ml-2 ${isDuplicate ? 'text-red-600 font-bold' : ''}`}>
                                           ({u.username})
-                                          {isDuplicate && <span className="ml-1 text-[10px] uppercase">[Trùng]</span>}
+                                          {isDuplicate && <span className="ml-1 text-[10px]">[Trùng]</span>}
                                       </span>
                                   </div>
                                   <div className="flex gap-2">
@@ -401,21 +402,21 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
   );
 
   const renderHeader = () => (
-    <div className="bg-red-900 text-white shadow-md shrink-0">
-      <div className="px-6 py-4 flex justify-between items-center">
+    <div className="bg-white text-stone-900 border-b border-stone-200 shrink-0">
+      <div className="px-4 md:px-5 h-16 flex justify-between items-center">
         <div className="flex items-center gap-3">
           <button 
             onClick={view === 'FORM' || view === 'AI_IMPORT' ? () => setView('LIST') : onClose}
-            className="p-2 -ml-2 hover:bg-white/10 rounded-full transition-colors"
+            aria-label="Quay lại" className="p-2 -ml-2 text-stone-600 hover:bg-stone-100 rounded-lg transition-colors"
           >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
           </button>
           <div>
-            <h2 className="text-lg font-bold uppercase tracking-wide">
+            <h2 className="text-base font-semibold leading-tight">
               {view === 'FORM' ? (editingUser ? 'Cập nhật Cán bộ' : 'Thêm Cán bộ') : 
                view === 'AI_IMPORT' ? 'Thêm Cán bộ bằng AI' : 'Quản lý Hệ thống'}
             </h2>
-            <p className="text-xs text-red-200">
+            <p className="text-xs text-stone-500">
               {view === 'FORM' ? 'Nhập thông tin tài khoản' : 
                view === 'AI_IMPORT' ? 'Nhập liệu tự động từ văn bản/ảnh' : 'Quản lý nhân sự & Thống kê'}
             </p>
@@ -427,10 +428,10 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
             {view !== 'FORM' && view !== 'AI_IMPORT' && (
                 <button 
                     onClick={handleRefresh}
-                    className={`p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors ${isRefreshing ? 'animate-spin' : ''}`}
+                    className={`p-2 text-stone-500 hover:bg-stone-100 hover:text-stone-900 rounded-lg transition-colors ${isRefreshing ? 'animate-spin' : ''}`}
                     title="Làm mới"
                 >
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
                 </button>
             )}
 
@@ -439,17 +440,17 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
             <>
                 <button 
                     onClick={() => setView('AI_IMPORT')}
-                    className="p-2 bg-blue-500/20 hover:bg-blue-500/40 rounded-full text-blue-200 hover:text-white transition-colors border border-blue-400/30"
+                    className="p-2 text-stone-500 hover:bg-stone-100 hover:text-stone-900 rounded-lg transition-colors"
                     title="Thêm bằng AI"
                 >
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
                 </button>
                 <button 
                     onClick={handleAddClick}
-                    className="p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"
+                    className="p-2 text-stone-500 hover:bg-stone-100 hover:text-stone-900 rounded-lg transition-colors"
                     title="Thêm mới thủ công"
                 >
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path></svg>
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4"></path></svg>
                 </button>
             </>
             )}
@@ -458,16 +459,16 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
 
       {/* Tabs */}
       {view !== 'FORM' && view !== 'AI_IMPORT' && (
-        <div className="flex px-4 gap-4 mt-1">
+        <div className="flex px-4 md:px-5 gap-5 -mb-px">
           <button 
             onClick={() => setView('LIST')}
-            className={`pb-3 px-2 text-sm font-bold border-b-4 transition-colors ${view === 'LIST' ? 'border-yellow-400 text-white' : 'border-transparent text-red-200 hover:text-white'}`}
+            className={`pb-2.5 text-sm border-b-2 transition-colors ${view === 'LIST' ? 'border-brand-700 text-stone-900 font-semibold' : 'border-transparent text-stone-500 hover:text-stone-900'}`}
           >
             Danh sách Cán bộ
           </button>
           <button 
             onClick={() => setView('STATS')}
-            className={`pb-3 px-2 text-sm font-bold border-b-4 transition-colors ${view === 'STATS' ? 'border-yellow-400 text-white' : 'border-transparent text-red-200 hover:text-white'}`}
+            className={`pb-2.5 text-sm border-b-2 transition-colors ${view === 'STATS' ? 'border-brand-700 text-stone-900 font-semibold' : 'border-transparent text-stone-500 hover:text-stone-900'}`}
           >
             Thống kê & Đánh giá
           </button>
@@ -521,7 +522,7 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
             <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
                     <span className="w-1 h-5 bg-red-700 rounded-full"></span>
-                    <h3 className="text-sm font-bold text-stone-700 uppercase tracking-wide">Điểm danh (Hôm nay)</h3>
+                    <h3 className="text-sm font-bold text-stone-700">Điểm danh (Hôm nay)</h3>
                 </div>
                 <div className="flex gap-2">
                    <span className="text-xs font-bold text-green-700 bg-green-50 border border-green-200 px-2 py-1 rounded-lg">
@@ -540,7 +541,7 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
                     return (
                     <div key={officer.id} className={`border rounded-xl p-3 flex items-center gap-3 shadow-sm transition-all ${isPresent ? 'bg-white border-green-200 ring-1 ring-green-50' : 'bg-stone-50 border-stone-200 opacity-70'}`}>
                         <div className="relative">
-                            <img src={officer.avatarUrl} className={`w-10 h-10 rounded-full border ${isPresent ? 'border-green-100' : 'grayscale border-stone-200'}`} alt="" />
+                            <Avatar name={officer.fullName} size={40} />
                             <span className={`absolute bottom-0 right-0 w-3 h-3 border-2 border-white rounded-full ${isPresent ? 'bg-green-500 animate-pulse' : 'bg-stone-400'}`}></span>
                         </div>
                         <div className="overflow-hidden min-w-0">
@@ -561,15 +562,15 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
         <div>
             <div className="flex items-center gap-2 mb-4">
                 <span className="w-1 h-5 bg-blue-600 rounded-full"></span>
-                <h3 className="text-sm font-bold text-stone-700 uppercase tracking-wide">Hiệu suất công việc</h3>
+                <h3 className="text-sm font-bold text-stone-700">Hiệu suất công việc</h3>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {officerStats.filter(stat => visibleUsers.some(u => u.id === stat.user.id)).map(stat => (
                 <div key={stat.user.id} className="bg-white rounded-2xl p-5 shadow-sm border border-stone-200 card-3d flex flex-col">
                     <div className="flex items-center gap-3 mb-4">
-                        <img src={stat.user.avatarUrl} className="w-12 h-12 rounded-full ring-2 ring-stone-100" alt="" />
+                        <Avatar name={stat.user.fullName} size={40} />
                         <div>
-                            <h3 className="font-bold text-base text-red-900">{stat.user.fullName}</h3>
+                            <h3 className="font-bold text-base text-stone-900">{stat.user.fullName}</h3>
                             <div className="flex items-center gap-2 mt-0.5">
                                 {stat.completionRate >= 80 ? (<span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-green-100 text-green-700 border border-green-200">Tốt ({stat.completionRate}%)</span>) : stat.overdue > 0 ? (<span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-red-100 text-red-700 border border-red-200">Cần nhắc nhở</span>) : (<span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-stone-100 text-stone-600 border border-stone-200">Đang hoạt động</span>)}
                             </div>
@@ -582,15 +583,15 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
 
                     <div className="grid grid-cols-3 gap-2 mt-auto text-center">
                         <div className="bg-stone-50 rounded-lg p-2 border border-stone-100">
-                            <p className="text-[10px] text-stone-500 font-bold uppercase">Tổng</p>
+                            <p className="text-[10px] text-stone-500 font-bold">Tổng</p>
                             <p className="text-lg font-bold text-stone-800">{stat.total}</p>
                         </div>
                         <div className="bg-green-50 rounded-lg p-2 border border-green-100">
-                            <p className="text-[10px] text-green-600 font-bold uppercase">Xong</p>
+                            <p className="text-[10px] text-green-600 font-bold">Xong</p>
                             <p className="text-lg font-bold text-green-600">{stat.completed}</p>
                         </div>
                         <div className={`rounded-lg p-2 border ${stat.overdue > 0 ? 'bg-red-50 border-red-100' : 'bg-orange-50 border-orange-100'}`}>
-                            <p className={`text-[10px] font-bold uppercase ${stat.overdue > 0 ? 'text-red-600' : 'text-orange-600'}`}>{stat.overdue > 0 ? 'Quá hạn' : 'Đang làm'}</p>
+                            <p className={`text-[10px] font-bold ${stat.overdue > 0 ? 'text-red-600' : 'text-orange-600'}`}>{stat.overdue > 0 ? 'Quá hạn' : 'Đang làm'}</p>
                             <p className={`text-lg font-bold ${stat.overdue > 0 ? 'text-red-600' : 'text-orange-600'}`}>{stat.overdue > 0 ? stat.overdue : stat.todo}</p>
                         </div>
                     </div>
@@ -618,7 +619,7 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
     return (
       <div className="mb-3 bg-amber-50 border border-amber-200 rounded-2xl p-4">
         <div className="flex items-center gap-2 mb-3">
-          <span className="text-lg">🔔</span>
+          <Bell className="w-5 h-5" />
           <h3 className="text-sm font-bold text-amber-900">
             Tài khoản chờ phê duyệt ({pending.length})
           </h3>
@@ -694,8 +695,8 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
          </div>
       ) : (
         filteredUsers.map(user => (
-            <div key={user.id} className="flex items-center gap-4 p-4 bg-white rounded-xl shadow-sm border border-stone-200 card-3d group hover:border-yellow-300 transition-all">
-            <img src={user.avatarUrl} alt="" className="w-12 h-12 rounded-full border border-stone-100 shadow-sm object-cover" onError={(e) => (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.fullName)}&background=random`} />
+            <div key={user.id} className="flex items-center gap-3.5 px-4 py-3 bg-white rounded-lg border border-stone-200 card-3d group">
+            <Avatar name={user.fullName} size={40} />
             <div className="flex-1 min-w-0">
                 <h3 className="text-sm font-bold text-stone-800 truncate">{user.fullName}</h3>
                 <p className="text-xs text-stone-500 font-mono mb-1">@{user.username}</p>
@@ -854,7 +855,7 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
         
         {/* Contact Info Group */}
         <div className="space-y-4 pt-2">
-            <h4 className="text-sm font-bold text-stone-700 uppercase tracking-wide border-b border-stone-100 pb-2">Thông tin liên lạc (Nhận thông báo)</h4>
+            <h4 className="text-sm font-bold text-stone-700 border-b border-stone-100 pb-2">Thông tin liên lạc (Nhận thông báo)</h4>
             
             {/* Email Field */}
             <div className="bg-purple-50 p-4 rounded-xl border border-purple-100">
@@ -876,9 +877,9 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
         {/* Permissions Group - Only for Admin */}
         {currentUser?.role === UserRole.ADMIN && (
             <div className="space-y-4 pt-2">
-                <h4 className="text-sm font-bold text-stone-700 uppercase tracking-wide border-b border-stone-100 pb-2">Phân quyền chức năng</h4>
+                <h4 className="text-sm font-bold text-stone-700 border-b border-stone-100 pb-2">Phân quyền chức năng</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {Object.values(UserPermission).map(perm => {
+                    {Object.values(UserPermission).filter(p => p !== UserPermission.MANAGE_WEEKLY_CALENDAR && p !== UserPermission.VIEW_WEEKLY_CALENDAR).map(perm => {
                         const isChecked = role === UserRole.ADMIN || permissions.includes(perm);
                         const isDisabled = role === UserRole.ADMIN;
                         return (
@@ -912,8 +913,6 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
                                 {perm === UserPermission.MANAGE_USERS ? 'Quản lý Cán bộ' :
                                  perm === UserPermission.ASSIGN_TASKS ? 'Giao việc & Phân công' :
                                  perm === UserPermission.VIEW_STATISTICS ? 'Xem Thống kê & Báo cáo' :
-                                 perm === UserPermission.MANAGE_WEEKLY_CALENDAR ? 'Quản lý Lịch tuần' :
-                                 perm === UserPermission.VIEW_WEEKLY_CALENDAR ? 'Xem Lịch tuần' :
                                  perm === UserPermission.MANAGE_UTILITIES ? 'Quản lý Tiện ích' :
                                  perm === UserPermission.MANAGE_ATTENDANCE ? 'Quản lý Điểm danh' : 
                                  perm === UserPermission.MANAGE_TASKS ? 'Quản lý toàn bộ nhiệm vụ' :
@@ -930,14 +929,14 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
 
       <div className="pt-6 flex gap-3">
         <Button type="button" variant="secondary" onClick={() => setView('LIST')} className="flex-1">Hủy</Button>
-        <Button type="submit" isLoading={isSubmitting} className="flex-1 bg-red-800 hover:bg-red-900 border-red-950">{editingUser ? 'Cập nhật' : 'Thêm mới'}</Button>
+        <Button type="submit" isLoading={isSubmitting} className="flex-1 bg-brand-700 hover:bg-brand-800 border-red-950">{editingUser ? 'Cập nhật' : 'Thêm mới'}</Button>
       </div>
     </form>
   );
 
   return (
     <div className="fixed inset-0 z-[70] flex items-end md:items-center justify-center bg-stone-900/60 backdrop-blur-sm transition-all p-0 md:p-4">
-      <div className="bg-stone-50 w-full h-full md:h-auto md:max-h-[90vh] md:max-w-4xl md:rounded-3xl rounded-none shadow-2xl overflow-hidden flex flex-col animate-fade-in-up">
+      <div className="bg-stone-50 w-full h-full md:h-auto md:max-h-[90vh] md:max-w-4xl md:rounded-xl rounded-none shadow-2xl overflow-hidden flex flex-col animate-fade-in-up">
         {renderHeader()}
         <div className="flex-1 overflow-hidden flex flex-col">
           {view === 'LIST' ? renderList() : view === 'STATS' ? renderStats() : view === 'AI_IMPORT' ? renderAIImport() : renderForm()}

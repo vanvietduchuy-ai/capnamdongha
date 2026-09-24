@@ -298,13 +298,13 @@ export const TaskModal: React.FC<TaskModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-[100] flex items-end md:items-center justify-center bg-stone-900/60 backdrop-blur-sm transition-all p-0 md:p-4">
-      <div className="bg-white w-full h-[100dvh] md:h-auto md:max-h-[95vh] md:rounded-3xl rounded-none shadow-2xl overflow-hidden flex flex-col animate-fade-in-up md:border-t-0 md:border-none">
+      <div className="bg-white w-full h-[100dvh] md:h-auto md:max-h-[95vh] md:rounded-xl rounded-none shadow-2xl overflow-hidden flex flex-col animate-fade-in-up md:border-t-0 md:border-none">
         
         {/* Header */}
         <div className="px-6 py-4 bg-white border-b border-stone-100 flex justify-between items-center sticky top-0 z-20 shadow-sm shrink-0">
           <div className="flex-1">
              <div className="flex items-center gap-2">
-                 <h2 className="text-xl font-extrabold text-red-900 uppercase tracking-tight">
+                 <h2 className="text-xl font-semibold text-stone-900">
                    {modalTitle}
                  </h2>
                  {initialTask && isAccepted && (
@@ -348,7 +348,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                    ) : (
                      <div className="flex items-center gap-2 text-stone-400 group-hover:text-yellow-700 transition-colors">
                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"></path><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
-                        <span className="text-sm font-bold uppercase">Chụp ảnh văn bản để điền tự động</span>
+                        <span className="text-sm font-bold">Chụp ảnh văn bản để điền tự động</span>
                      </div>
                    )}
                 </div>
@@ -356,7 +356,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
 
              <div className="flex items-center gap-2 mb-4">
                <span className="w-1 h-4 bg-red-700 rounded-full"></span>
-               <h3 className="text-sm font-bold text-stone-700 uppercase tracking-wide">1. Thông tin văn bản</h3>
+               <h3 className="text-sm font-bold text-stone-700">1. Thông tin văn bản</h3>
              </div>
 
              <div className="grid grid-cols-12 gap-4">
@@ -407,7 +407,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
           <div className="mb-8">
              <div className="flex items-center gap-2 mb-4">
                <span className="w-1 h-4 bg-amber-500 rounded-full"></span>
-               <h3 className="text-sm font-bold text-stone-700 uppercase tracking-wide">2. Nội dung & Phân công</h3>
+               <h3 className="text-sm font-bold text-stone-700">2. Nội dung & Phân công</h3>
              </div>
 
              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-5">
@@ -439,7 +439,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
              </div>
 
              <div>
-                <label className="block text-sm font-bold text-red-900 mb-1.5">Nội dung chỉ đạo chi tiết</label>
+                <label className="block text-sm font-bold text-stone-900 mb-1.5">Nội dung chỉ đạo chi tiết</label>
                 <textarea
                   className="w-full px-4 py-3 border border-stone-200 rounded-xl bg-stone-50 text-stone-800 font-medium placeholder-stone-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all h-32 resize-none shadow-sm"
                   value={description}
@@ -454,13 +454,13 @@ export const TaskModal: React.FC<TaskModalProps> = ({
           <div>
              <div className="flex items-center gap-2 mb-4">
                <span className="w-1 h-4 bg-stone-400 rounded-full"></span>
-               <h3 className="text-sm font-bold text-stone-700 uppercase tracking-wide">3. Thời hạn & Thiết lập</h3>
+               <h3 className="text-sm font-bold text-stone-700">3. Thời hạn & Thiết lập</h3>
              </div>
 
              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 items-start">
                 <div className="w-full">
                    <div className="flex justify-between items-center mb-1.5">
-                      <label className="block text-sm font-bold text-red-900">Hạn hoàn thành</label>
+                      <label className="block text-sm font-bold text-stone-900">Hạn hoàn thành</label>
                       {canEditDetails && (
                         <div className="flex items-center gap-2">
                            <input 
@@ -497,10 +497,10 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                             value={status}
                             onChange={(e) => setStatus(e.target.value as TaskStatus)}
                             options={[
-                                { value: TaskStatus.PENDING, label: '⚪ Chờ xử lý' },
-                                { value: TaskStatus.IN_PROGRESS, label: '🟡 Đang thực hiện' },
-                                { value: TaskStatus.COMPLETED, label: '🟢 Hoàn thành' },
-                                ...((isLeader || isCreator) ? [{ value: TaskStatus.CANCELLED, label: '⚫ Hủy bỏ' }] : [])
+                                { value: TaskStatus.PENDING, label: 'Chờ xử lý' },
+                                { value: TaskStatus.IN_PROGRESS, label: 'Đang thực hiện' },
+                                { value: TaskStatus.COMPLETED, label: 'Hoàn thành' },
+                                ...((isLeader || isCreator) ? [{ value: TaskStatus.CANCELLED, label: 'Hủy bỏ' }] : [])
                             ]}
                             className="bg-white font-bold"
                         />
@@ -510,7 +510,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
 
                 {(isLeader || isCreator || isCreatingPersonalTask) && (
                    <div className="bg-stone-50 p-4 rounded-xl border border-stone-200">
-                      <label className="text-xs font-bold text-stone-500 uppercase tracking-wider mb-3 block">Chu kỳ lặp lại</label>
+                      <label className="text-xs font-bold text-stone-500 mb-3 block">Chu kỳ lặp lại</label>
                       <div className="flex flex-wrap gap-2">
                          {[
                            { type: RecurringType.WEEKLY, label: 'Tuần' },
@@ -554,7 +554,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
             <div className="mt-8 pt-6 border-t border-dashed border-stone-300">
               <div className="bg-blue-50/50 p-5 rounded-2xl border border-blue-100">
                 <div className="flex justify-between items-center mb-2">
-                   <label className="text-xs font-bold text-blue-800 uppercase">Ý kiến / Đề xuất của Cán bộ</label>
+                   <label className="text-xs font-bold text-blue-800">Ý kiến / Đề xuất của Cán bộ</label>
                    {isLeader && proposal && !initialTask?.isProposalRead && <span className="text-[10px] bg-red-500 text-white px-2 py-0.5 rounded-full animate-pulse">Mới</span>}
                 </div>
                 <textarea
@@ -568,7 +568,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
 
               {proposal && (
                 <div className="mt-4 p-5 rounded-2xl border border-stone-200 bg-stone-50">
-                   <label className="text-xs font-bold text-red-900 uppercase mb-3 block">Chỉ đạo / Phản hồi của Chỉ huy</label>
+                   <label className="text-xs font-bold text-stone-900 mb-3 block">Chỉ đạo / Phản hồi của Chỉ huy</label>
                    {isLeader ? (
                      <div className="space-y-3">
                         <div className="flex gap-2">
@@ -627,7 +627,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                <button 
                  type="button"
                  onClick={handleSubmit} 
-                 className="flex-1 py-3 rounded-xl bg-red-800 hover:bg-red-900 text-white text-sm font-bold uppercase tracking-wide shadow-lg shadow-red-900/20 active:scale-[0.98] transition-all"
+                 className="flex-1 py-3 rounded-xl bg-brand-700 hover:bg-brand-800 text-white text-sm font-bold transition-all"
                >
                   {isLeader ? 'Xác nhận giao việc' : 'Lưu việc cá nhân'}
                </button>
@@ -637,7 +637,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                 <button
                   type="button"
                   onClick={handleAcceptTask}
-                  className="w-full py-3 rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-sm font-bold uppercase tracking-wide shadow-lg shadow-blue-600/30 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+                  className="w-full py-3 rounded-xl bg-stone-900 hover:bg-stone-800 text-white text-sm font-bold transition-all flex items-center justify-center gap-2"
                 >
                   <svg className="w-5 h-5 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                   Xác nhận tiếp nhận
@@ -659,7 +659,7 @@ export const TaskModal: React.FC<TaskModalProps> = ({
                    <button 
                      type="button"
                      onClick={handleSubmit} 
-                     className="flex-1 py-3 rounded-xl bg-red-800 hover:bg-red-900 text-white text-sm font-bold uppercase tracking-wide shadow-lg shadow-red-900/20 active:scale-[0.98] transition-all"
+                     className="flex-1 py-3 rounded-xl bg-brand-700 hover:bg-brand-800 text-white text-sm font-bold transition-all"
                    >
                       Cập nhật
                    </button>

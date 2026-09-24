@@ -1,3 +1,4 @@
+import { Avatar } from '../UI';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { MapContainer, TileLayer, FeatureGroup, Polygon, Rectangle, Popup, Marker, Polyline, useMap, LayersControl, Tooltip, Circle, ImageOverlay } from 'react-leaflet';
 import L from 'leaflet';
@@ -1251,7 +1252,7 @@ export const MapDuty: React.FC<MapDutyProps> = ({ currentUser, users, isLeader }
       >
         <div className="p-4 border-b bg-stone-50 pt-16 md:pt-4">
            <div className="flex justify-between items-center mb-2">
-             <h3 className="font-bold text-lg text-red-900 uppercase flex items-center gap-2">
+             <h3 className="font-bold text-lg text-stone-900 flex items-center gap-2">
                <Shield size={18} />
                Sơ đồ bảo vệ
              </h3>
@@ -1270,13 +1271,13 @@ export const MapDuty: React.FC<MapDutyProps> = ({ currentUser, users, isLeader }
                      className={`text-xs px-2 py-1 rounded font-medium transition-colors ${isDeleteMode ? 'bg-red-600 text-white animate-pulse' : 'bg-stone-200 hover:bg-stone-300 text-stone-700'}`}
                      title="Bật chế độ xóa nhanh"
                    >
-                     {isDeleteMode ? 'Đang xóa...' : '🗑️ Xóa'}
+                     {isDeleteMode ? 'Đang xóa...' : 'Xóa'}
                    </button>
                    <button 
                      onClick={() => setShowDutyModal(true)}
                      className="text-xs bg-stone-200 hover:bg-stone-300 px-2 py-1 rounded text-stone-700 font-medium"
                    >
-                     ⚙️ Thiết lập
+                     Thiết lập
                    </button>
                  </div>
                )}
@@ -1394,7 +1395,7 @@ export const MapDuty: React.FC<MapDutyProps> = ({ currentUser, users, isLeader }
           {/* My Assignment Section */}
           {myAssignedZones.length > 0 && (
             <div className="mb-4">
-              <h4 className="text-xs font-bold text-stone-500 uppercase mb-2">Nhiệm vụ của tôi</h4>
+              <h4 className="text-xs font-bold text-stone-500 mb-2">Nhiệm vụ của tôi</h4>
               {myAssignedZones.map(zone => (
                 <div 
                   key={zone.id}
@@ -1415,7 +1416,7 @@ export const MapDuty: React.FC<MapDutyProps> = ({ currentUser, users, isLeader }
             </div>
           )}
 
-          <h4 className="text-xs font-bold text-stone-500 uppercase mb-2">Danh sách chốt ({filteredZones.length})</h4>
+          <h4 className="text-xs font-bold text-stone-500 mb-2">Danh sách chốt ({filteredZones.length})</h4>
           {filteredZones.map(zone => {
              const assigned = users.filter(u => zone.assignedUserIds.includes(u.id));
              const isMyZone = zone.assignedUserIds.includes(currentUser.id);
@@ -1464,7 +1465,7 @@ export const MapDuty: React.FC<MapDutyProps> = ({ currentUser, users, isLeader }
       {/* Rotation Warning */}
       {rotation !== 0 && isLeader && !isMobile && (
         <div className="absolute top-4 right-16 z-[1000] bg-yellow-100 text-yellow-800 px-3 py-1 rounded-lg text-xs font-bold shadow-sm border border-yellow-300 animate-fade-in">
-          ⚠️ Xoay về 0° để vẽ
+          Xoay về 0° để vẽ
         </div>
       )}
 
@@ -1638,7 +1639,7 @@ export const MapDuty: React.FC<MapDutyProps> = ({ currentUser, users, isLeader }
                      <div className="p-2 min-w-[200px]">
                         <h3 className="font-bold text-lg mb-2" style={{ color: zone.color }}>{zone.label}</h3>
                         <div className="mb-3">
-                           <h4 className="text-xs font-bold text-stone-500 uppercase mb-1">Cán bộ phụ trách:</h4>
+                           <h4 className="text-xs font-bold text-stone-500 mb-1">Cán bộ phụ trách:</h4>
                            <div className="flex flex-wrap gap-1">
                               {assigned.map(u => (
                                  <div key={u.id} className={`flex items-center gap-1 px-2 py-1 rounded-full ${u.id === currentUser.id ? 'bg-blue-100 text-blue-800' : 'bg-stone-100'}`}>
@@ -1849,7 +1850,7 @@ export const MapDuty: React.FC<MapDutyProps> = ({ currentUser, users, isLeader }
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-fade-in-up">
             <div className="px-6 py-4 border-b flex justify-between items-center bg-stone-50">
               <h3 className="font-bold text-lg">Thiết lập thông tin bảo vệ</h3>
-              <button onClick={() => setShowDutyModal(false)} className="text-stone-400 hover:text-red-600">✕</button>
+              <button onClick={() => setShowDutyModal(false)} aria-label="Đóng" className="p-1.5 rounded-lg text-stone-400 hover:bg-stone-100 hover:text-stone-700"><X className="w-5 h-5" /></button>
             </div>
             <div className="p-6 space-y-4">
               <div>
@@ -2036,7 +2037,7 @@ export const MapDuty: React.FC<MapDutyProps> = ({ currentUser, users, isLeader }
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-fade-in-up">
                <div className="px-6 py-4 border-b flex justify-between items-center bg-stone-50">
                   <h3 className="font-bold text-lg">{isLeader ? 'Cập nhật thông tin' : 'Thông tin chốt bảo vệ'}</h3>
-                  <button onClick={() => setShowAssignModal(false)} className="text-stone-400 hover:text-red-600">✕</button>
+                  <button onClick={() => setShowAssignModal(false)} aria-label="Đóng" className="p-1.5 rounded-lg text-stone-400 hover:bg-stone-100 hover:text-stone-700"><X className="w-5 h-5" /></button>
                </div>
                <div className="p-6 space-y-4">
                   <div>
@@ -2120,7 +2121,7 @@ export const MapDuty: React.FC<MapDutyProps> = ({ currentUser, users, isLeader }
                                    name="zone-users"
                                 />
                               )}
-                              <img src={user.avatarUrl} className="w-6 h-6 rounded-full" />
+                              <Avatar name={user.fullName} size={24} />
                               <span className="text-sm font-medium">{user.fullName}</span>
                            </label>
                         ))}

@@ -96,33 +96,31 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ tasks, onEditTask, o
   return (
     <div className="flex flex-col h-full gap-4 pb-safe">
         {/* Main Calendar Card */}
-        <div className="bg-white rounded-3xl shadow-sm border border-stone-100 overflow-hidden flex flex-col flex-shrink-0 card-3d">
+        <div className="bg-white rounded-xl border border-stone-200 overflow-hidden flex flex-col flex-shrink-0">
         
         {/* Calendar Header */}
-        <div className="bg-red-900 text-white px-4 py-3 md:px-6 md:py-4 flex items-center justify-between shadow-md z-10 relative overflow-hidden">
-            {/* Decoration */}
-            <div className="absolute top-0 right-0 w-24 h-24 bg-white/5 rounded-full blur-2xl pointer-events-none"></div>
+        <div className="bg-white text-stone-900 px-4 py-3 md:px-5 md:py-3.5 flex items-center justify-between border-b border-stone-200 relative">
 
             <div className="flex items-center gap-3 z-10">
                 <div>
-                    <h2 className="text-lg md:text-2xl font-bold uppercase tracking-wide leading-none">
+                    <h2 className="text-base md:text-lg font-semibold leading-none">
                     Tháng {month + 1}, {year}
                     </h2>
                     <div className="flex items-center gap-2 mt-1">
-                        <span className="text-[10px] md:text-xs text-yellow-400 font-bold bg-white/10 px-2 py-0.5 rounded">
+                        <span className="text-xs text-stone-600 font-medium bg-stone-100 px-1.5 py-0.5 rounded">
                             {getFullDateInfo(currentMonthDate).canChi.year}
                         </span>
-                        <button onClick={handleToday} className="text-[10px] md:text-xs font-bold text-white/80 hover:text-white underline decoration-dotted">
+                        <button onClick={handleToday} className="text-xs font-medium text-brand-700 hover:underline">
                             Về hôm nay
                         </button>
                     </div>
                 </div>
             </div>
             <div className="flex gap-1 z-10">
-                <button onClick={handlePrevMonth} className="p-2 hover:bg-white/20 rounded-full transition-colors active:scale-95">
+                <button onClick={handlePrevMonth} aria-label="Tháng trước" className="p-2 text-stone-600 hover:bg-stone-100 rounded-lg transition-colors">
                     <svg className="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7"></path></svg>
                 </button>
-                <button onClick={handleNextMonth} className="p-2 hover:bg-white/20 rounded-full transition-colors active:scale-95">
+                <button onClick={handleNextMonth} aria-label="Tháng sau" className="p-2 text-stone-600 hover:bg-stone-100 rounded-lg transition-colors">
                     <svg className="w-5 h-5 md:w-6 md:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path></svg>
                 </button>
             </div>
@@ -131,7 +129,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ tasks, onEditTask, o
         {/* Weekday Headers */}
         <div className="grid grid-cols-7 bg-stone-50 border-b border-stone-200">
             {['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'].map((day, idx) => (
-                <div key={day} className={`py-2 md:py-3 text-center text-[10px] md:text-xs font-bold uppercase tracking-wider ${idx === 6 ? 'text-red-600' : 'text-stone-500'}`}>
+                <div key={day} className={`py-2 md:py-3 text-center text-[10px] md:text-xs font-bold ${idx === 6 ? 'text-red-600' : 'text-stone-500'}`}>
                 <span className="md:hidden">{day}</span>
                 <span className="hidden md:inline">Thứ {day === 'CN' ? 'CN' : day.replace('T', '')}</span>
                 </div>
@@ -163,7 +161,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ tasks, onEditTask, o
                     className={`
                         bg-white relative group transition-all cursor-pointer flex flex-col items-center md:items-stretch
                         min-h-[55px] md:min-h-[120px] 
-                        ${isSelected ? 'bg-yellow-50 ring-inset ring-2 ring-yellow-500 z-10' : 'hover:bg-stone-50'}
+                        ${isSelected ? 'bg-brand-50 ring-inset ring-2 ring-brand-600 z-10' : 'hover:bg-stone-50'}
                         ${isCurrentDay && !isSelected ? 'bg-red-50' : ''}
                     `}
                 >
@@ -221,11 +219,11 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ tasks, onEditTask, o
         {/* Mobile Detail View (Smart Agenda Style) */}
         <div className="md:hidden flex-1 overflow-hidden flex flex-col">
             <div className="px-4 py-2 flex items-baseline gap-2 mb-2">
-                <h3 className="text-xl font-extrabold text-stone-800">
+                <h3 className="text-xl font-semibold text-stone-800">
                     {selectedDate.getDate()} <span className="text-sm font-medium text-stone-500">tháng {selectedDate.getMonth() + 1}</span>
                 </h3>
                 <div className="h-px bg-stone-200 flex-1"></div>
-                <span className="text-xs font-bold text-stone-400 uppercase">
+                <span className="text-xs font-bold text-stone-400">
                     {selectedDayInfo.info.canChi.day}
                 </span>
             </div>
@@ -259,7 +257,7 @@ export const CalendarView: React.FC<CalendarViewProps> = ({ tasks, onEditTask, o
                             </div>
 
                             {/* Task Card */}
-                            <div className={`flex-1 bg-white rounded-xl p-3 border shadow-sm transition-all active:scale-[0.98] ${isOverdue ? 'border-red-200 bg-red-50/30' : isCompleted ? 'border-green-200 opacity-80' : 'border-stone-100'}`}>
+                            <div className={`flex-1 bg-white rounded-xl p-3 border shadow-sm transition-all ${isOverdue ? 'border-red-200 bg-red-50/30' : isCompleted ? 'border-green-200 opacity-80' : 'border-stone-100'}`}>
                                 <div className="flex justify-between items-start mb-1.5">
                                     <div className="flex gap-2">
                                         <PriorityBadge priority={task.priority} />

@@ -1,7 +1,7 @@
 /* Service Worker cho ứng dụng Điểm danh Hội nghị – CAP Nam Đông Hà */
 /* Nhận thông báo nền bằng cách hỏi định kỳ Supabase (REST) */
 
-const CACHE_NAME = 'cap-namdongha-supabase-v1';
+const CACHE_NAME = 'cap-namdongha-v4-hieu-ung';
 const ASSETS_TO_CACHE = ['/', '/index.html', '/manifest.json'];
 
 const DB_NAME = 'sw_config_db';
@@ -96,8 +96,8 @@ async function checkNotifications() {
 function showNotification(notif) {
   self.registration.showNotification(notif.title || 'Thông báo mới', {
     body: notif.message || '',
-    icon: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSMAT1EEiTjShLjCbC_DbVGPRAXHcbA_IZNww&s',
-    badge: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSMAT1EEiTjShLjCbC_DbVGPRAXHcbA_IZNww&s',
+    icon: '/icon-192.png',
+    badge: '/icon-192.png',
     tag: notif.id,
     renotify: true,
     requireInteraction: true,
@@ -165,3 +165,24 @@ async function performBackgroundRefresh() {
     console.error('SW: Làm mới nền thất bại:', error);
   }
 }
+
+
+/* ---------- MẠNG: ưu tiên máy chủ, mất mạng thì mở bản đã lưu ----------
+   Chỉ xử lý việc mở trang (navigation). Dữ liệu (Supabase) luôn đi thẳng lên máy chủ. */
+self.addEventListener('fetch', (event) => {
+  const req = event.request;
+  if (req.method !== 'GET' || req.mode !== 'navigate') return;
+  event.respondWith(
+    fetch(req)
+      .then((res) => {
+        const copy = res.clone();
+        caches.open(CACHE_NAME).then((c) => c.put('/index.html', copy)).catch(() => {});
+        return res;
+      })
+      .catch(() => caches.match('/index.html').then((r) => r || caches.match('/')).then((r) => r || new Response(
+        '<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">' +
+        '<div style="font-family:system-ui;padding:32px;text-align:center;color:#111827">' +
+        '<h2>Không có kết nối mạng</h2><p>Vui lòng kiểm tra Wi-Fi/4G rồi mở lại ứng dụng.</p></div>',
+        { headers: { 'Content-Type': 'text/html; charset=utf-8' } })))
+  );
+});

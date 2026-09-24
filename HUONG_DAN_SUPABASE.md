@@ -6,7 +6,7 @@ Công an phường Nam Đông Hà · Dữ liệu lưu trên **Supabase** (Postgr
 
 ## 1. Cài đặt cơ sở dữ liệu (làm 1 lần, khoảng 5 phút)
 
-Vào dự án Supabase của đơn vị → **SQL Editor** → dán và chạy **đúng thứ tự** 4 file trong thư mục `supabase/`:
+Vào dự án Supabase của đơn vị → **SQL Editor** → dán và chạy **đúng thứ tự** 6 file trong thư mục `supabase/`:
 
 | Thứ tự | File | Nội dung |
 |---|---|---|
@@ -14,14 +14,18 @@ Vào dự án Supabase của đơn vị → **SQL Editor** → dán và chạy *
 | 2 | `02_auth_otp.sql` | Mã hoá mật khẩu (bcrypt), đăng ký tài khoản, OTP quên mật khẩu |
 | 3 | `03_absence_report.sql` | Bảng lý do vắng mặt, cột còn thiếu, chỉ mục tăng tốc |
 | 4 | `04_bao_mat.sql` | Phiên đăng nhập, khoá quyền ghi trực tiếp, hàm điểm danh trên máy chủ |
+| 5 | `05_hoi_nghi.sql` | Tạo hội nghị trước, chọn thành phần, **Bắt đầu / Kết thúc** điểm danh |
+| 6 | `06_ma_qr_dong.sql` | Mã QR có chữ ký máy chủ, đổi **3 giây/lần**, máy chủ kiểm tra từng lần quét |
 
-- Cả 4 file an toàn khi chạy lại. **Nếu chạy lại, luôn chạy đủ cả 4 file theo thứ tự** (file 04 phải chạy sau cùng).
+- Cả 6 file an toàn khi chạy lại. **Nếu chạy lại, luôn chạy đủ theo thứ tự.** Đặc biệt: đã chạy lại file 04 thì **bắt buộc chạy lại 05 và 06** ngay sau đó (nếu không, mã QR sẽ mất lớp kiểm tra chữ ký).
+- Đơn vị đã chạy 01–05: chỉ cần chạy thêm **06_ma_qr_dong.sql**, rồi **triển khai bản web mới ngay** (bản web cũ không điểm danh được với máy chủ đã chạy 06 và ngược lại — không làm việc này trong lúc đang họp).
+- Đơn vị mới chạy 01–04: chạy thêm 05 rồi 06. Các phiên điểm danh cũ được giữ nguyên, tự xếp vào mục "Đã kết thúc".
 - Dữ liệu cũ được giữ nguyên; mật khẩu chữ thường đang có sẽ tự động được mã hoá.
 - **Sau khi chạy file 04, mọi người phải đăng nhập lại một lần** (hệ thống chuyển sang phiên đăng nhập do máy chủ cấp).
 
 Phần mềm đã cài sẵn địa chỉ dự án Supabase của đơn vị (`DEFAULT_SUPABASE_URL` trong `App.tsx`), nên mọi máy tự kết nối, không phải nhập tay. Nếu đổi sang dự án khác: sửa 2 dòng `DEFAULT_SUPABASE_URL`, `DEFAULT_SUPABASE_KEY` rồi deploy lại.
 
-Kiểm tra: ở **màn hình đăng nhập**, bấm nút góc trên bên phải (**Đã kết nối**) → **Kiểm tra cơ sở dữ liệu** → phải báo "đầy đủ bảng và hàm nghiệp vụ (01–04)".
+Kiểm tra: ở **màn hình đăng nhập**, bấm nút góc trên bên phải (**Đã kết nối**) → **Kiểm tra cơ sở dữ liệu** → phải báo "đầy đủ bảng và hàm nghiệp vụ (01–06)".
 
 ## 2. Dịch vụ gửi email (bắt buộc nếu dùng đăng ký tài khoản / quên mật khẩu)
 
@@ -43,31 +47,44 @@ Hạn mức Gmail thường: 100 thư/ngày.
 
 ## 3. Điểm danh hội nghị
 
-**Người quản lý** (Quản trị viên, Trưởng/Phó Trưởng CAP, hoặc cán bộ được cấp quyền "Quản lý điểm danh"):
+**Người quản lý** (Quản trị viên, Trưởng/Phó Trưởng CAP, hoặc cán bộ được cấp quyền "Quản lý điểm danh") — mục **Điểm danh hội nghị → Hội nghị**:
 
-1. Mục **Điểm danh hội nghị → Quản lý** → nhập tên hội nghị, thời gian, chọn thành phần → **Tạo mã QR**.
-2. Chiếu mã lên màn hình. Có 2 loại mã:
-   - **QR cán bộ**: cán bộ mở phần mềm → **Quét mã**.
-   - **QR khách mời**: khách dùng camera điện thoại quét, điền họ tên – đơn vị – số điện thoại, không cần tài khoản.
-3. Mã tự đổi mỗi 5 giây (chống chụp ảnh gửi cho người vắng). Mỗi điện thoại chỉ điểm danh cho 1 người.
-4. Bấm **Kết thúc điểm danh** → hộp tổng kết hiện số có mặt/vắng → **Báo cáo Word** hoặc **Bảng Excel** xuất ngay cho phiên đó.
+1. **Tạo hội nghị trước** (nút **+ Tạo hội nghị**, trên điện thoại là nút đỏ góc dưới): tên, thời gian dự kiến, địa điểm.
+2. **Chọn thành phần tham dự**: tìm theo tên, chọn nhanh *Tất cả / Lãnh đạo, chỉ huy / Cán bộ / từng tổ*, hoặc chọn theo **nhóm đã lưu** (VD: Chi uỷ, Tổ công tác). Bấm **+ Lưu lựa chọn thành nhóm** để dùng lại lần sau.
+   → Hội nghị ở trạng thái **Chưa bắt đầu**: chưa có mã QR, không ai điểm danh được. Có thể sửa, đổi thành phần hoặc xoá.
+3. Đến giờ, bấm **▶ Bắt đầu điểm danh** → chọn thời gian tự đóng (30 phút – 8 giờ, phòng khi quên bấm Kết thúc) → mã QR hiện ngay.
+   - **Mã cho cán bộ**: cán bộ mở phần mềm → **Quét mã**. **Mã cho khách mời**: khách dùng camera điện thoại quét, điền họ tên – đơn vị – số điện thoại.
+   - Chạm vào mã để **phóng to trình chiếu**. Mã tự đổi **mỗi 3 giây** (vạch đỏ dưới mã là thời gian còn lại).
+   - Mỗi mã mang **chữ ký của máy chủ** (khoá riêng từng hội nghị, chỉ người quản lý lấy được). Máy chủ kiểm tra chữ ký và độ mới theo **đồng hồ máy chủ**: mã quá khoảng 9–12 giây bị từ chối, nên ảnh chụp gửi qua Zalo/Messenger hầu như không kịp dùng; không tự tạo được mã; giờ trên điện thoại cán bộ sai cũng không ảnh hưởng.
+   - Khách mời: quét mã → được **10 phút** để điền biểu mẫu; đường dẫn tự xoá khỏi thanh địa chỉ nên chuyển tiếp cho người khác không dùng được.
+   - Điều chỉnh (nếu mạng hội trường chậm, cán bộ hay báo "mã hết hạn"): `UPDATE app_settings SET value='4' WHERE key='qr_grace_steps';` (mặc định 3 chu kỳ ≈ 9–12 giây). Chu kỳ đổi mã: khoá `qr_step_ms` (mặc định 3000). Thời gian khách điền biểu mẫu: `guest_ticket_min` (mặc định 10).
+   - Theo dõi trực tiếp *Chưa điểm danh / Đã điểm danh*; **+15 / +30 phút** để gia hạn; **+ Thành phần** để bổ sung người (đang điểm danh thì chỉ thêm, không bớt được).
+4. Bấm **■ Kết thúc điểm danh** → mã QR ngừng hiệu lực, hiện **Kết quả** (triệu tập / có mặt / vắng / tỷ lệ, danh sách vắng) → xuất **Word** hoặc **Excel** ngay.
+5. Cần cho người đến muộn điểm danh: ở hội nghị đã kết thúc bấm **↻ Mở lại điểm danh**, xong bấm Kết thúc lại (giờ bắt đầu ban đầu được giữ nguyên trong báo cáo).
 
-Điểm danh được xác nhận **trên máy chủ**: không ai điểm danh hộ được, không sửa/xoá được bản ghi điểm danh, không sửa được danh sách triệu tập sau khi đã mở phiên.
+Điểm danh được xác nhận **trên máy chủ**: không ai điểm danh hộ được, không điểm danh được nếu không quét mã đang chiếu, không điểm danh được khi hội nghị chưa bắt đầu hoặc đã kết thúc, không sửa/xoá được bản ghi điểm danh, không bỏ bớt được thành phần sau khi đã bắt đầu.
 
 ## 4. Báo cáo cán bộ vắng mặt
 
 Mục **Điểm danh hội nghị → Báo cáo vắng** (chỉ người quản lý thấy):
 
 1. Chọn khoảng thời gian (Hôm nay / Tuần / Tháng / Quý / Năm hoặc tự chọn ngày).
-2. Tích chọn các phiên cần báo cáo. Phiên **đang mở** không được chọn sẵn vì chưa đủ căn cứ tính vắng.
-3. Với từng cán bộ vắng, chọn **Tình trạng**: *Có lý do / Không lý do / Chưa xác minh* và ghi lý do (VD: đi công tác, nghỉ phép). Tự lưu, các máy khác thấy ngay.
-4. Nhập chức danh, họ tên người ký → xuất:
+2. Mở mục **Hội nghị đưa vào báo cáo** để chọn/bỏ hội nghị. Hội nghị **đang điểm danh** không được chọn sẵn vì chưa đủ căn cứ tính vắng; hội nghị **chưa bắt đầu** không đưa vào báo cáo.
+3. Với từng cán bộ vắng, bấm một trong 3 nút *Chưa xác minh / Có lý do / Không lý do* và ghi lý do (VD: đi công tác, nghỉ phép). Tự lưu, các máy khác thấy ngay.
+4. Mở mục **Người ký báo cáo** để nhập chức danh, họ tên (phần mềm tự nhớ) → bấm **Xuất Word / Xuất Excel** (trên điện thoại 2 nút luôn nằm ở cuối màn hình):
    - **Word (.docx)**: Báo cáo đúng thể thức NĐ30 (TNR 14, lề 2-2-3-2 cm, giãn dòng 1,2, ký hiệu `/BC-CAP-TH`), gồm: I. Kết quả điểm danh (có bảng theo từng phiên), II. Danh sách cán bộ vắng mặt kèm lý do, III. Tổng hợp số lần vắng theo cán bộ, nơi nhận, chữ ký. Để trống số và ngày tháng để văn thư điền.
    - **Excel (.xlsx)**: 3 trang tính — Danh sách vắng mặt, Tổng hợp theo phiên, Tổng hợp theo cán bộ.
 
 Cán bộ đã bị xoá khỏi hệ thống vẫn xuất hiện trong báo cáo cũ dưới dạng "(Tài khoản đã xoá: mã)". Vì vậy **nên xuất và lưu báo cáo trước khi xoá tài khoản**.
 
-## 5. Đăng ký tài khoản & quên mật khẩu
+## 5. Đặt lại mật khẩu toàn bộ tài khoản về 123123
+
+Chạy file `supabase/dat_lai_mat_khau_123123.sql` trong SQL Editor (chạy 1 lần, không đưa vào quy trình chạy lại):
+- Mọi tài khoản (kể cả `admin`) đăng nhập bằng **123123**; mọi thiết bị đang đăng nhập bị đăng xuất.
+- Lần đăng nhập tới, mỗi người **bắt buộc đổi mật khẩu riêng** (xoá khối số 3 trong file nếu không muốn bắt buộc).
+- Dòng cuối file in ra số tài khoản đã đặt lại để đối chiếu.
+
+## 5b. Đăng ký tài khoản & quên mật khẩu
 
 - **Đăng ký**: màn hình đăng nhập → "Đăng ký ngay" → nhận mã 6 số qua email → nhập mã → **chờ duyệt**.
 - **Duyệt**: Quản lý Cán bộ → khung "Tài khoản chờ phê duyệt" → Duyệt / Từ chối (Quản trị viên, Trưởng CAP, Phó Trưởng CAP phụ trách chung).
@@ -111,14 +128,68 @@ Nếu điện thoại vẫn hiện bản cũ sau khi cập nhật: đóng hẳn 
 
 ---
 
+## 8b. Logo đơn vị
+
+Phần mềm dùng tệp `public/logo.svg` (biểu tượng khiên – sao, vẽ sẵn, không phụ thuộc trang web khác). Muốn dùng logo Công an chính thức:
+1. Chép tệp ảnh logo (nền trong suốt, vuông) vào thư mục `public/`, đặt tên `logo.png`.
+2. Mở `lib/brand.ts`, đổi `LOGO_URL = '/logo.svg'` thành `LOGO_URL = '/logo.png'`.
+3. (Tuỳ chọn) Thay `public/icon-192.png`, `icon-512.png`, `icon-180.png` — biểu tượng khi cài ứng dụng lên màn hình điện thoại.
+4. Deploy lại.
+
+## 8c. Cài ứng dụng lên điện thoại, máy tính
+
+Phần mềm tự nhận biết thiết bị và trình duyệt, rồi hiện đúng cách cài:
+
+| Thiết bị / trình duyệt | Cách cài |
+|---|---|
+| Android – Chrome, Edge | Nút **Cài đặt ứng dụng** → trình duyệt hỏi → **Cài đặt**. Một chạm |
+| Android – Samsung Internet | Hướng dẫn: ≡ → Thêm trang vào → Màn hình chính |
+| iPhone/iPad – Safari | Hướng dẫn từng bước, đúng theo iOS 26 (nút ••• → Chia sẻ) hoặc iOS cũ (nút Chia sẻ). Sau khi thêm, **mở từ biểu tượng và đăng nhập lại một lần** |
+| Mở từ link trong **Zalo, Facebook, Messenger** | Trình duyệt của các ứng dụng này không cài được. Android có nút **Mở bằng Chrome**; iPhone hướng dẫn ••• → Mở trong Safari, kèm nút sao chép link |
+| Máy tính – Chrome, Edge | Nút cài một chạm, hoặc biểu tượng cài ở thanh địa chỉ. Có mã QR để cài sang điện thoại |
+
+Lối vào: dải gợi ý ở trang chủ (bấm "Để sau" thì 7 ngày sau mới hiện lại), mục **Cài đặt ứng dụng** trong menu, dòng **Cài ứng dụng lên điện thoại** ở màn đăng nhập. Máy đã cài thì các mục này tự ẩn.
+
+**Trang công khai `/cai-dat`** (VD: `https://<tên-miền>/cai-dat`), không cần đăng nhập:
+- Gửi link này cho cán bộ, hoặc bấm **In tờ QR**: in ra A4 một mã QR lớn để dán ở trụ sở, hội trường.
+- Dặn cán bộ **quét bằng camera điện thoại**, không quét bằng Zalo (Zalo mở trong trình duyệt riêng, không cài được).
+
+## 8d. Quét mã từ xa (điện thoại mạnh, yếu)
+
+Bộ quét mã cán bộ đã được viết lại (tệp `lib/qrScanEngine.ts`):
+
+- Xin camera 1920×1080 (máy mạnh) hoặc 1280×720 (máy yếu), giải mã ở độ phân giải gốc. Bản cũ chỉ giải mã ảnh khoảng 360 điểm ảnh.
+- Tự quét luân phiên toàn khung và vùng giữa khung, nên bắt được mã nhỏ ở xa mà không cần bấm gì.
+- Nút **1× / 2× / 4×** và chụm hai ngón:
+  - máy có zoom camera (iPhone iOS 17 trở lên, phần lớn máy Android dùng Chrome) phóng bằng camera thật;
+  - máy không có thì phóng số.
+- Android Chrome dùng bộ đọc mã có sẵn của máy. iPhone dùng bộ đọc ZXing đi kèm.
+- Máy chậm thì tự giảm kích thước ảnh và nhịp quét, không giật, không nóng máy.
+- Mã cán bộ chuyển sang mức sửa lỗi L: mã thưa hơn (29×29 ô thay cho 37×37), ô to hơn khoảng 27%.
+
+Khoảng cách quét được, ước tính theo kết quả kiểm thử, đã trừ hao cho rung tay và loá màn:
+
+| Mã QR hiển thị rộng | Bản cũ | Máy yếu | Máy mạnh | Máy có zoom camera 2–3× |
+|---|---|---|---|---|
+| 9 cm (ô mã trên màn hình máy tính) | khoảng 0,3 m | khoảng 0,7 m | khoảng 1 m | khoảng 2–3 m |
+| 55 cm (tivi 55 inch, chế độ phóng to) | khoảng 2 m | khoảng 4 m | khoảng 5,5 m | khoảng 11–16 m |
+| 1,2 m (máy chiếu, chế độ phóng to) | khoảng 4 m | khoảng 9 m | khoảng 12 m | trên 20 m |
+
+Mẹo cho phòng họp lớn:
+
+- Luôn bấm vào mã để **phóng to toàn màn hình** khi trình chiếu.
+- Ngồi xa hơn khoảng 10 lần chiều rộng mã thì bấm 2× hoặc 4×.
+- Giảm độ sáng máy chiếu nếu mã bị loá trắng.
+
 ## 9. Danh sách kiểm tra trước khi đưa vào sử dụng
 
-- [ ] Chạy đủ 4 file SQL theo thứ tự trên dự án Supabase của đơn vị.
+- [ ] Chạy đủ 6 file SQL theo thứ tự trên dự án Supabase của đơn vị (đã chạy 01–05 thì chạy thêm 06), triển khai bản web mới ngay sau đó.
 - [ ] Đăng nhập `admin` → **đổi mật khẩu ngay** (mật khẩu mặc định 123123 ai cũng biết).
-- [ ] Màn hình đăng nhập → nút **Đã kết nối** → Kiểm tra cơ sở dữ liệu → báo đầy đủ 01–04.
+- [ ] Màn hình đăng nhập → nút **Đã kết nối** → Kiểm tra cơ sở dữ liệu → báo đầy đủ 01–06.
 - [ ] Kiểm tra danh sách cán bộ, **điền email** cho từng người (cần cho quên mật khẩu).
 - [ ] Cấp quyền "Quản lý điểm danh" cho cán bộ trực tiếp tổ chức hội nghị (nếu không phải Trưởng/Phó).
 - [ ] Triển khai `Mailer.gs`, khai báo `mailer_url`, `mailer_key` (nếu dùng đăng ký/quên mật khẩu).
-- [ ] Chạy thử 1 phiên điểm danh với 3–4 người, 1 khách mời; kết thúc phiên; xuất Word + Excel.
+- [ ] Chạy thử: tạo hội nghị, chọn 3–4 người, Bắt đầu, cho 1 khách mời quét mã, Kết thúc; xuất Word + Excel.
 - [ ] Thử trên cả Android và iPhone: quét mã, camera được cấp quyền, phần mềm chạy trên HTTPS (link Vercel).
+- [ ] In tờ QR ở trang `/cai-dat`, dán tại trụ sở; nhắc cán bộ cài ứng dụng và bật thông báo.
 - [ ] Nhắc cán bộ: mỗi người dùng điện thoại riêng để điểm danh; giờ điện thoại để tự động.

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { X, Database } from 'lucide-react';
 import { Button, Input } from './UI';
 import { MockDB, CloudConfig } from '../services/mockDatabase';
 import { CLOUD_CONFIG_KEY } from '../lib/supabase';
@@ -97,19 +98,19 @@ export const CloudSyncModal: React.FC<CloudSyncModalProps> = ({ isOpen, onClose,
 
   return (
     <div className="fixed inset-0 z-[70] flex items-center justify-center bg-stone-900/80 backdrop-blur-sm p-4 animate-fade-in-up">
-      <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden border-t-4 border-green-600 flex flex-col max-h-[90vh]">
+      <div className="bg-white w-full max-w-lg rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
         <div className="px-6 py-4 border-b border-stone-100 bg-green-50 flex justify-between items-center">
           <div>
             <h2 className="text-xl font-bold text-green-900">Kết nối Supabase</h2>
             <p className="text-xs text-green-700">Cơ sở dữ liệu đám mây của đơn vị</p>
           </div>
-          <button onClick={onClose} className="p-2 bg-white rounded-full text-stone-500 hover:text-red-600">✕</button>
+          <button onClick={onClose} aria-label="Đóng" className="p-2 rounded-lg text-stone-400 hover:bg-stone-100 hover:text-stone-700"><X className="w-5 h-5" /></button>
         </div>
 
         <div className="p-6 overflow-y-auto space-y-4">
           {status === 'CONNECTED' ? (
             <div className="text-center py-6">
-              <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">🗄️</div>
+              <div className="w-11 h-11 bg-stone-100 text-stone-700 rounded-lg flex items-center justify-center mx-auto mb-4"><Database className="w-5 h-5" /></div>
               <h3 className="font-bold text-green-700 text-lg">Đã kết nối Supabase!</h3>
               <p className="text-stone-500 text-sm mt-2 mb-2">
                 Dữ liệu điểm danh, nhiệm vụ, lịch công tác được đồng bộ tức thời giữa các máy.

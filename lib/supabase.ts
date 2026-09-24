@@ -111,7 +111,7 @@ export const callRpc = async <T = any>(fn: string, params: Record<string, any>):
         ok: false,
         code,
         message: notInstalled
-          ? 'Máy chủ chưa được cập nhật chức năng này. Quản trị viên cần chạy đủ 4 file SQL trong thư mục supabase/.'
+          ? 'Máy chủ chưa được cập nhật chức năng này. Quản trị viên cần chạy đủ các file SQL (01 → 06) trong thư mục supabase/.'
           : (error.message || 'Lỗi máy chủ')
       } as any;
     }

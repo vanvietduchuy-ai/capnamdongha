@@ -6,7 +6,7 @@
  *
  * Các thư viện nặng (xlsx, docx) chỉ được tải khi bấm xuất file.
  */
-import { AttendanceAbsence, AttendanceRecord, AttendanceSession, User, UserDepartment, UserRole } from '../types';
+import { AttendanceAbsence, AttendanceRecord, AttendanceSession, User, UserDepartment, UserRole, sessionTime } from '../types';
 
 /* ============================ MÔ HÌNH SỐ LIỆU ============================ */
 
@@ -118,7 +118,7 @@ export const buildAbsenceReport = (
 ): AbsenceReport => {
   const userMap = new Map(users.map(u => [u.id, u]));
   const absMap = new Map(absences.map(a => [`${a.sessionId}__${a.userId}`, a]));
-  const sorted = [...sessions].sort((a, b) => a.createdAt - b.createdAt);
+  const sorted = [...sessions].sort((a, b) => sessionTime(a) - sessionTime(b));
 
   const summaries: SessionSummary[] = [];
   const rows: AbsenceRow[] = [];
@@ -160,7 +160,7 @@ export const buildAbsenceReport = (
   };
 
   rows.sort((a, b) =>
-    a.session.createdAt - b.session.createdAt ||
+    sessionTime(a.session) - sessionTime(b.session) ||
     rank(a) - rank(b) ||
     a.fullName.localeCompare(b.fullName, 'vi')
   );
@@ -247,7 +247,7 @@ export const exportAbsenceExcel = async (rep: AbsenceReport) => {
   ];
   rep.rows.forEach((r, i) => {
     const st = r.absence?.excused === true ? 'Có lý do' : r.absence?.excused === false ? 'Không lý do' : 'Chưa xác minh';
-    s1.push([i + 1, r.fullName, r.position, r.department, r.session.title, fmtDateTime(r.session.createdAt), st, r.absence?.reason || '']);
+    s1.push([i + 1, r.fullName, r.position, r.department, r.session.title, fmtDateTime(sessionTime(r.session)), st, r.absence?.reason || '']);
   });
   if (rep.rows.length === 0) s1.push(['', 'Không có cán bộ vắng mặt.']);
   s1.push([]);
@@ -270,7 +270,7 @@ export const exportAbsenceExcel = async (rep: AbsenceReport) => {
     ['STT', 'Hội nghị, cuộc họp', 'Thời gian', 'Triệu tập', 'Có mặt', 'Vắng mặt', 'Tỷ lệ có mặt (%)', 'Khách mời']
   ];
   rep.sessions.forEach((s, i) => {
-    s2.push([i + 1, s.session.title, fmtDateTime(s.session.createdAt), s.expected, s.present, s.absent, s.rate, s.guests]);
+    s2.push([i + 1, s.session.title, fmtDateTime(sessionTime(s.session)), s.expected, s.present, s.absent, s.rate, s.guests]);
   });
   s2.push(['', 'CỘNG', '', rep.totals.expected, rep.totals.present, rep.totals.absent, rep.totals.rate,
     rep.sessions.reduce((n, s) => n + s.guests, 0)]);
@@ -416,7 +416,7 @@ export const buildAbsenceDocx = async (rep: AbsenceReport, signer: SignerInfo): 
   if (single) {
     const s = rep.sessions[0];
     children.push(body(
-      `Thời gian mở điểm danh: ${fmtDateTime(s.session.createdAt).replace(' ', ' ngày ')}. ` +
+      `Thời gian mở điểm danh: ${fmtDateTime(sessionTime(s.session)).replace(' ', ' ngày ')}. ` +
       `Tổng số cán bộ được triệu tập: ${s.expected} đồng chí; có mặt: ${s.present} đồng chí (đạt ${pctText(s.rate)}%); ` +
       `vắng mặt: ${s.absent} đồng chí, trong đó có lý do: ${t.excused}, không có lý do: ${t.unexcused}` +
       (t.pending ? `, chưa xác minh lý do: ${t.pending}` : '') + '.' +
@@ -433,7 +433,7 @@ export const buildAbsenceDocx = async (rep: AbsenceReport, signer: SignerInfo): 
       ['STT', 'Hội nghị, cuộc họp', 'Thời gian', 'Triệu tập', 'Có mặt', 'Vắng', 'Tỷ lệ (%)'],
       [
         ...rep.sessions.map((s, i) => [
-          String(i + 1), s.session.title, fmtDateTime(s.session.createdAt),
+          String(i + 1), s.session.title, fmtDateTime(sessionTime(s.session)),
           String(s.expected), String(s.present), String(s.absent), pctText(s.rate)
         ]),
         ['', 'Cộng', '', String(t.expected), String(t.present), String(t.absent), pctText(t.rate)]
@@ -460,7 +460,7 @@ export const buildAbsenceDocx = async (rep: AbsenceReport, signer: SignerInfo): 
     children.push(dataTable(
       ['STT', 'Họ và tên', 'Tổ công tác', 'Hội nghị, cuộc họp', 'Ngày', 'Lý do vắng'],
       rep.rows.map((r, i) => [
-        String(i + 1), r.fullName, r.department, r.session.title, fmtDate(r.session.createdAt), absenceStatusText(r.absence)
+        String(i + 1), r.fullName, r.department, r.session.title, fmtDate(sessionTime(r.session)), absenceStatusText(r.absence)
       ]),
       [700, 1900, 1400, 2000, 1371, 1700],
       ['C', 'L', 'L', 'L', 'C', 'L']

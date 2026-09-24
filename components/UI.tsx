@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { TaskPriority, TaskStatus, RecurringType } from '../types';
+import { Check, X } from 'lucide-react';
 
 // --- Badges (Pill Shape, Warm Colors) ---
 export const StatusBadge: React.FC<{ status: TaskStatus }> = ({ status }) => {
@@ -13,11 +14,11 @@ export const StatusBadge: React.FC<{ status: TaskStatus }> = ({ status }) => {
 
   // Override for strictly Red/Yellow theme request
   const themeStyles = {
-    [TaskStatus.PENDING]: 'bg-stone-100 text-stone-600 ring-1 ring-stone-200',
-    [TaskStatus.IN_PROGRESS]: 'bg-yellow-100 text-yellow-800 ring-1 ring-yellow-400',
-    [TaskStatus.COMPLETED]: 'bg-green-100 text-green-800 ring-1 ring-green-300',
-    [TaskStatus.CANCELLED]: 'bg-stone-200 text-stone-500 ring-1 ring-stone-300',
-    [TaskStatus.OVERDUE]: 'bg-red-700 text-white ring-1 ring-red-800 font-extrabold tracking-wider',
+    [TaskStatus.PENDING]: 'bg-stone-100 text-stone-700 ring-1 ring-inset ring-stone-200',
+    [TaskStatus.IN_PROGRESS]: 'bg-amber-50 text-amber-800 ring-1 ring-inset ring-amber-200',
+    [TaskStatus.COMPLETED]: 'bg-emerald-50 text-emerald-800 ring-1 ring-inset ring-emerald-200',
+    [TaskStatus.CANCELLED]: 'bg-stone-100 text-stone-500 ring-1 ring-inset ring-stone-200',
+    [TaskStatus.OVERDUE]: 'bg-red-50 text-red-700 ring-1 ring-inset ring-red-200',
   };
   
   const labels = {
@@ -25,11 +26,11 @@ export const StatusBadge: React.FC<{ status: TaskStatus }> = ({ status }) => {
     [TaskStatus.IN_PROGRESS]: 'Đang thực hiện',
     [TaskStatus.COMPLETED]: 'Hoàn thành',
     [TaskStatus.CANCELLED]: 'Đã hủy',
-    [TaskStatus.OVERDUE]: 'ĐÃ QUÁ HẠN',
+    [TaskStatus.OVERDUE]: 'Quá hạn',
   };
 
   return (
-    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold ${themeStyles[status]}`}>
+    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium ${themeStyles[status]}`}>
       {labels[status]}
     </span>
   );
@@ -62,7 +63,7 @@ export const RecurringBadge: React.FC<{ type?: RecurringType[] | RecurringType }
   if (!text) return null;
 
   return (
-    <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wide bg-amber-50 text-amber-700 ring-1 ring-amber-200 max-w-[150px] truncate" title={`Lặp lại: ${text}`}>
+    <span className="ml-2 inline-flex items-center px-2.5 py-0.5 rounded-md text-[11px] font-medium bg-stone-100 text-stone-600 ring-1 ring-stone-200 max-w-[150px] truncate" title={`Lặp lại: ${text}`}>
       <svg className="w-3 h-3 mr-1 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
       {text}
     </span>
@@ -73,8 +74,8 @@ export const PriorityBadge: React.FC<{ priority: TaskPriority }> = ({ priority }
   const styles = {
     [TaskPriority.LOW]: 'text-stone-500 bg-stone-100',
     [TaskPriority.MEDIUM]: 'text-amber-700 bg-amber-50',
-    [TaskPriority.HIGH]: 'text-orange-700 bg-orange-50 font-bold',
-    [TaskPriority.URGENT]: 'text-red-700 bg-red-100 font-extrabold border border-red-200',
+    [TaskPriority.HIGH]: 'text-orange-700 bg-orange-100/60 font-medium',
+    [TaskPriority.URGENT]: 'text-red-700 bg-red-50 font-semibold ring-1 ring-inset ring-red-200',
   };
   
   const labels = {
@@ -85,7 +86,7 @@ export const PriorityBadge: React.FC<{ priority: TaskPriority }> = ({ priority }
   };
 
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs ${styles[priority]}`}>
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs ${styles[priority]}`}>
       <span className="w-1.5 h-1.5 rounded-full bg-current mr-1.5 opacity-70"></span>
       {labels[priority]}
     </span>
@@ -103,33 +104,33 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 export const Button: React.FC<ButtonProps> = ({ 
   children, variant = 'primary', size = 'md', className = '', isLoading, icon, ...props 
 }) => {
-  const baseStyle = "inline-flex items-center justify-center rounded-xl font-bold uppercase tracking-wide transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed";
+  const baseStyle = "inline-flex items-center justify-center gap-2 rounded-lg font-semibold transition-colors duration-150 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed";
   
   const sizes = {
-    sm: "px-3 py-1.5 text-xs",
-    md: "px-5 py-2.5 text-sm",
-    lg: "px-6 py-3 text-base",
+    sm: "px-3 h-8 text-xs",
+    md: "px-4 h-10 text-sm",
+    lg: "px-5 h-11 text-[15px]",
   };
 
   const variants = {
     // Primary: Strong Red (Police Theme)
-    primary: "bg-red-800 text-white hover:bg-red-900 shadow-lg shadow-red-900/20 hover:shadow-xl hover:-translate-y-0.5 focus:ring-red-800 border-b-2 border-red-950",
-    secondary: "bg-white text-red-900 border border-red-200 hover:bg-red-50 hover:border-red-300 shadow-sm focus:ring-red-200",
-    outline: "border-2 border-red-800 text-red-800 hover:bg-red-50",
-    danger: "bg-orange-600 text-white hover:bg-orange-700 shadow-lg shadow-orange-600/20 focus:ring-orange-500",
+    primary: "bg-brand-700 text-white hover:bg-brand-800 focus-visible:ring-brand-600",
+    secondary: "bg-white text-stone-800 border border-stone-300 hover:bg-stone-50 focus-visible:ring-stone-300",
+    outline: "border border-brand-700 text-brand-700 hover:bg-brand-50",
+    danger: "bg-white text-brand-700 border border-stone-300 hover:bg-brand-50 hover:border-brand-600 focus-visible:ring-brand-600",
     ghost: "bg-transparent text-stone-600 hover:bg-stone-100 hover:text-stone-900",
-    success: "bg-green-600 text-white hover:bg-green-700 shadow-lg shadow-green-600/20 focus:ring-green-500",
+    success: "bg-emerald-700 text-white hover:bg-emerald-800 focus-visible:ring-emerald-600",
   };
 
   return (
     <button className={`${baseStyle} ${sizes[size as keyof typeof sizes] || sizes.md} ${variants[variant]} ${className}`} disabled={isLoading} {...props}>
       {isLoading ? (
-        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-current" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <svg className="animate-spin -ml-0.5 h-4 w-4 text-current" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
         </svg>
       ) : icon ? (
-        <span className="mr-2 -ml-1">{icon}</span>
+        <span className="-ml-0.5 inline-flex">{icon}</span>
       ) : null}
       {children}
     </button>
@@ -145,7 +146,7 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
 export const Input: React.FC<InputProps> = ({ label, error, className = '', ...props }) => {
   return (
     <div className="w-full">
-      {label && <label className="block text-sm font-bold text-red-950 mb-1.5">{label}</label>}
+      {label && <label className="block text-[13px] font-medium text-stone-700 mb-1.5">{label}</label>}
       <div className="relative">
          {props.type === 'search' && (
            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -153,7 +154,7 @@ export const Input: React.FC<InputProps> = ({ label, error, className = '', ...p
            </div>
          )}
          <input
-          className={`w-full px-4 py-2.5 border rounded-xl bg-white text-stone-800 placeholder-stone-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 transition-all ${error ? 'border-red-300 focus:border-red-500 focus:ring-red-500/20' : 'border-stone-200'} ${props.type === 'search' ? 'pl-10' : ''} ${className}`}
+          className={`w-full h-10 px-3 border rounded-lg bg-white text-stone-900 text-[15px] md:text-sm placeholder-stone-400 focus:outline-none focus:ring-3 focus:ring-brand-600/15 focus:border-brand-600 transition-colors ${error ? 'border-red-400' : 'border-stone-300'} ${props.type === 'search' ? 'pl-10' : ''} ${className}`}
           {...props}
         />
       </div>
@@ -171,10 +172,10 @@ interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
 export const Select: React.FC<SelectProps> = ({ label, options, className = '', ...props }) => {
   return (
     <div className="w-full">
-      {label && <label className="block text-sm font-bold text-red-950 mb-1.5">{label}</label>}
+      {label && <label className="block text-[13px] font-medium text-stone-700 mb-1.5">{label}</label>}
       <div className="relative">
         <select
-          className={`w-full appearance-none px-4 py-2.5 border border-stone-200 rounded-xl bg-white text-stone-800 focus:outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 transition-all cursor-pointer ${className}`}
+          className={`w-full h-10 appearance-none pl-3 pr-9 border border-stone-300 rounded-lg bg-white text-stone-900 text-[15px] md:text-sm focus:outline-none focus:ring-3 focus:ring-brand-600/15 focus:border-brand-600 transition-colors cursor-pointer ${className}`}
           {...props}
         >
           {options.map((opt) => (
@@ -252,23 +253,23 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({ label, options, select
 
   return (
     <div className="w-full" ref={containerRef}>
-      {label && <label className="block text-sm font-bold text-red-950 mb-1.5">{label}</label>}
+      {label && <label className="block text-[13px] font-medium text-stone-700 mb-1.5">{label}</label>}
       <div 
-        className={`relative min-h-[44px] w-full px-2 py-1.5 border rounded-xl bg-white text-stone-800 transition-all cursor-text ${disabled ? 'opacity-60 cursor-not-allowed bg-stone-50' : 'hover:border-amber-400'} ${isOpen ? 'ring-2 ring-amber-500/30 border-amber-500' : 'border-stone-200'} ${className}`}
+        className={`relative min-h-[44px] w-full px-2 py-1.5 border rounded-lg bg-white text-stone-900 transition-colors cursor-text ${disabled ? 'opacity-60 cursor-not-allowed bg-stone-50' : 'hover:border-stone-400'} ${isOpen ? 'ring-3 ring-brand-600/15 border-brand-600' : 'border-stone-300'} ${className}`}
         onClick={() => !disabled && inputRef.current?.focus()}
       >
         <div className="flex flex-wrap gap-1.5 pr-6">
           {selectedValues.map(val => {
             const opt = options.find(o => o.value === val);
             return (
-              <span key={val} className="inline-flex items-center px-2 py-1 rounded-lg text-xs font-bold bg-amber-50 text-amber-800 border border-amber-100 animate-fade-in">
+              <span key={val} className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-stone-100 text-stone-800 border border-stone-200">
                 {opt?.label}
                 <button 
                   onClick={(e) => removeValue(e, val)}
-                  className="ml-1.5 text-amber-600 hover:text-red-600 rounded-full focus:outline-none"
+                  className="ml-1.5 text-stone-400 hover:text-brand-700 rounded-full focus:outline-none" aria-label="Bỏ chọn"
                   type="button"
                 >
-                  ✕
+                  <X className="w-3 h-3" />
                 </button>
               </span>
             );
@@ -311,10 +312,10 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({ label, options, select
                                  e.stopPropagation(); 
                                  handleSelect(opt.value); 
                              }}
-                             className={`w-full text-left px-4 py-2.5 text-sm cursor-pointer hover:bg-amber-50 transition-colors flex items-center justify-between ${isSelected ? 'bg-amber-50/50 text-amber-900 font-bold' : 'text-stone-700'}`}
+                             className={`w-full text-left px-4 py-2.5 text-sm cursor-pointer hover:bg-stone-50 transition-colors flex items-center justify-between ${isSelected ? 'text-brand-700 font-medium' : 'text-stone-700'}`}
                          >
                              <span>{opt.label}</span>
-                             {isSelected && <span className="text-amber-600 font-bold">✓</span>}
+                             {isSelected && <Check className="w-4 h-4 text-brand-700" />}
                          </button>
                      );
                  })
@@ -325,3 +326,76 @@ export const MultiSelect: React.FC<MultiSelectProps> = ({ label, options, select
     </div>
   );
 };
+
+/** Ảnh đại diện: chữ cái đầu của họ tên (không phụ thuộc dịch vụ ảnh bên ngoài) */
+export const Avatar: React.FC<{ name?: string; size?: number; className?: string }> = ({ name = '', size = 32, className = '' }) => {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  const initials = (parts.length >= 2 ? parts[parts.length - 2][0] + parts[parts.length - 1][0] : (parts[0] || '?').slice(0, 2)).toUpperCase();
+  return (
+    <span className={`inline-flex items-center justify-center rounded-full bg-stone-200 text-stone-700 font-semibold shrink-0 ${className}`}
+      style={{ width: size, height: size, fontSize: Math.round(size * 0.38) }} title={name}>
+      {initials}
+    </span>
+  );
+};
+
+
+// --- Hiệu ứng chuyển động dùng chung ---
+export const prefersReducedMotion = () =>
+  typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+
+/** Rung ngắn trên điện thoại (Android). iPhone không hỗ trợ rung từ trang web nên bỏ qua. */
+export const haptic = (pattern: number | number[] = 40) => {
+  try { if (!prefersReducedMotion()) navigator.vibrate?.(pattern); } catch { /* bỏ qua */ }
+};
+
+/** Số đếm từ giá trị cũ lên giá trị mới (lần đầu đếm từ 0) */
+export const CountUp: React.FC<{ value: number; duration?: number; suffix?: string }> = ({ value, duration = 900, suffix = '' }) => {
+  const [shown, setShown] = useState(prefersReducedMotion() ? value : 0);
+  const fromRef = useRef(0);
+  useEffect(() => {
+    if (prefersReducedMotion()) { setShown(value); fromRef.current = value; return; }
+    const from = fromRef.current, t0 = performance.now();
+    let raf = 0;
+    const step = (t: number) => {
+      const k = Math.min(1, (t - t0) / duration), e = 1 - Math.pow(1 - k, 3);
+      setShown(Math.round(from + (value - from) * e));
+      if (k < 1) raf = requestAnimationFrame(step); else fromRef.current = value;
+    };
+    raf = requestAnimationFrame(step);
+    return () => { cancelAnimationFrame(raf); fromRef.current = value; };
+  }, [value, duration]);
+  return <>{shown}{suffix}</>;
+};
+
+/** Số nảy lên mỗi khi giá trị đổi (không nảy ở lần hiện đầu tiên) */
+export const BumpNumber: React.FC<{ value: React.ReactNode; className?: string }> = ({ value, className = '' }) => {
+  const first = useRef(true);
+  const [k, setK] = useState(0);
+  useEffect(() => { if (first.current) { first.current = false; return; } setK(x => x + 1); }, [value]);
+  return <span key={k} className={`${k ? 'num-bump' : ''} ${className}`}>{value}</span>;
+};
+
+/** Khung chờ tải dạng danh sách thẻ */
+export const SkeletonList: React.FC<{ rows?: number; className?: string }> = ({ rows = 3, className = '' }) => (
+  <div className={`space-y-2.5 ${className}`} aria-busy="true" aria-label="Đang tải">
+    {Array.from({ length: rows }).map((_, i) => (
+      <div key={i} className="bg-white rounded-xl border border-stone-200 p-4">
+        <div className="skel h-4 w-3/5" />
+        <div className="skel h-3 w-4/5 mt-3" />
+        <div className="skel h-3 w-2/5 mt-2" />
+      </div>
+    ))}
+  </div>
+);
+
+/** Dấu kết quả: vòng tròn bật ra, dấu tích tự vẽ (thành công) hoặc dấu X (lỗi) */
+export const ResultMark: React.FC<{ ok: boolean; size?: number }> = ({ ok, size = 72 }) => (
+  <div className="result-mark rounded-full mx-auto flex items-center justify-center text-white"
+    style={{ width: size, height: size, background: ok ? '#10b981' : '#dc2626',
+      boxShadow: `0 10px 24px -8px ${ok ? 'rgba(16,185,129,.7)' : 'rgba(220,38,38,.7)'}, inset 0 -3px 6px rgba(0,0,0,.15), inset 0 1px 1px rgba(255,255,255,.4)` }}>
+    <svg width={size * 0.5} height={size * 0.5} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      {ok ? <path d="M5 12.5l4.5 4.5L19 7.5" /> : <path d="M6.5 6.5l11 11M17.5 6.5l-11 11" />}
+    </svg>
+  </div>
+);

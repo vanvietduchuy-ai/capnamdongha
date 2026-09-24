@@ -86,7 +86,24 @@ export interface AttendanceSession {
   expiresAt: number;
   isActive: boolean;
   expectedUserIds: string[]; // List of users expected to attend
+  status?: 'DRAFT' | 'OPEN' | 'CLOSED'; // Chưa bắt đầu / Đang điểm danh / Đã kết thúc
+  scheduledAt?: number | null; // Thời gian dự kiến họp
+  location?: string | null;    // Địa điểm
+  startedAt?: number | null;   // Lúc bắt đầu điểm danh
+  endedAt?: number | null;     // Lúc kết thúc điểm danh
 }
+
+export type SessionState = 'DRAFT' | 'OPEN' | 'CLOSED';
+
+/** Trạng thái thực tế của phiên (phiên đang mở nhưng quá giờ tự đóng coi như đã kết thúc) */
+export const sessionState = (s: AttendanceSession, now: number = Date.now()): SessionState => {
+  if (s.status === 'DRAFT') return 'DRAFT';
+  if ((s.status ?? 'OPEN') === 'OPEN' && s.isActive !== false && s.expiresAt > now) return 'OPEN';
+  return 'CLOSED';
+};
+
+/** Mốc thời gian dùng cho báo cáo: lúc bắt đầu điểm danh (phiên cũ: lúc tạo) */
+export const sessionTime = (s: AttendanceSession) => s.startedAt || s.createdAt;
 
 export interface AttendanceRecord {
   id: string;

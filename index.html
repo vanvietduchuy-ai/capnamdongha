@@ -2,113 +2,22 @@
 <html lang="vi">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>Công An Phường Nam Đông Hà - Quảng Trị</title>
-    
-    <!-- PWA Manifest -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Công an phường Nam Đông Hà</title>
+    <meta name="theme-color" content="#ffffff" />
+
     <link rel="manifest" href="/manifest.json" />
-
-    <!-- WEB LOGO / FAVICON -->
-    <link rel="icon" type="image/svg+xml" href="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSMAT1EEiTjShLjCbC_DbVGPRAXHcbA_IZNww&s" />
-    
-    <!-- iOS Support Meta Tags -->
-    <link rel="apple-touch-icon" href="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSMAT1EEiTjShLjCbC_DbVGPRAXHcbA_IZNww&s" />
+    <link rel="icon" type="image/svg+xml" href="/logo.svg" />
+    <link rel="apple-touch-icon" href="/icon-180.png" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="CAP Nam Đông Hà" />
-    
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&display=swap" rel="stylesheet">
-    <style>
-      body {
-        font-family: 'Be Vietnam Pro', sans-serif;
-        background-color: #fff7ed; /* Orange-50 warm background */
-        color: #450a0a; /* Red-950 text */
-        overflow-x: hidden;
-      }
-      
-      /* 3D Background Blobs - Red & Gold Theme */
-      .blob {
-        position: absolute;
-        filter: blur(80px);
-        z-index: -1;
-        opacity: 0.5;
-        animation: float 10s infinite ease-in-out alternate;
-      }
-      .blob-1 { top: -10%; left: -10%; width: 500px; height: 500px; background: #dc2626; animation-delay: 0s; } /* Red */
-      .blob-2 { bottom: -10%; right: -10%; width: 400px; height: 400px; background: #f59e0b; animation-delay: -5s; } /* Amber */
-      .blob-3 { top: 40%; left: 40%; width: 300px; height: 300px; background: #fbbf24; opacity: 0.3; animation-delay: -2s; } /* Gold */
 
-      @keyframes float {
-        0% { transform: translate(0, 0) scale(1); }
-        100% { transform: translate(20px, 40px) scale(1.1); }
-      }
-
-      /* Custom Scrollbar */
-      ::-webkit-scrollbar { width: 6px; height: 6px; }
-      ::-webkit-scrollbar-track { background: transparent; }
-      ::-webkit-scrollbar-thumb { background: #ca8a04; border-radius: 10px; } /* Gold thumb */
-      
-      /* Mobile Optimizations */
-      .safe-area-bottom {
-        padding-bottom: env(safe-area-inset-bottom);
-      }
-
-      /* 3D Card Effect */
-      .card-3d {
-        transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-        box-shadow: 0 4px 6px -1px rgba(185, 28, 28, 0.1), 0 2px 4px -1px rgba(185, 28, 28, 0.06); /* Reddish shadow */
-      }
-      .card-3d:active {
-        transform: scale(0.98);
-      }
-      @media (min-width: 768px) {
-        .card-3d:hover {
-          transform: translateY(-4px) scale(1.01);
-          box-shadow: 0 20px 25px -5px rgba(185, 28, 28, 0.15), 0 10px 10px -5px rgba(185, 28, 28, 0.1);
-        }
-      }
-
-      @keyframes slide-in-left {
-        from { transform: translateX(-100%); }
-        to { transform: translateX(0); }
-      }
-      .animate-slide-in-left {
-        animation: slide-in-left 0.3s ease-out forwards;
-      }
-      
-      @keyframes bounce-slow {
-        0%, 100% { transform: translateY(0); }
-        50% { transform: translateY(-10px); }
-      }
-      .animate-bounce-slow {
-        animation: bounce-slow 2s infinite;
-      }
-    </style>
-  <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/service-worker.js')
-          .then(registration => {
-            console.log('ServiceWorker registered with scope:', registration.scope);
-          })
-          .catch(error => {
-            console.log('ServiceWorker registration failed:', error);
-          });
-      });
-    }
-  </script>
-<link rel="stylesheet" href="/index.css">
-</head>
+    <!-- Dùng cho chức năng Xuất ảnh nhắc việc -->
+    <script defer src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+  </head>
   <body>
-    <div id="root" class="relative min-h-screen overflow-hidden">
-       <div class="blob blob-1"></div>
-       <div class="blob blob-2"></div>
-       <div class="blob blob-3"></div>
-    </div>
-  <script type="module" src="/index.tsx"></script>
-</body>
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
 </html>

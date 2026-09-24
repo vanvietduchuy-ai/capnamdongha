@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Sparkles, RotateCw } from 'lucide-react';
 import { Button } from './UI';
 import { GeminiService } from '../services/geminiService';
 
@@ -34,13 +35,13 @@ export const TaskSuggestionModal: React.FC<TaskSuggestionModalProps> = ({ isOpen
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-stone-900/60 backdrop-blur-sm p-4 animate-fade-in-up">
-      <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden border-t-4 border-yellow-500 flex flex-col max-h-[80vh]">
+      <div className="bg-white w-full max-w-2xl rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[80vh]">
         
         {/* Header */}
         <div className="px-6 py-4 border-b border-red-50 bg-red-900 text-white flex justify-between items-center">
           <div>
             <h2 className="text-xl font-bold flex items-center gap-2">
-              <span>✨</span> AI Trợ Lý Nghiệp Vụ
+              <Sparkles className="w-4 h-4" /> Trợ lý nghiệp vụ
             </h2>
             <p className="text-xs text-yellow-400 opacity-90">Đề xuất công việc dựa trên tình hình thực tế</p>
           </div>
@@ -68,12 +69,12 @@ export const TaskSuggestionModal: React.FC<TaskSuggestionModalProps> = ({ isOpen
                   <div key={idx} className="bg-white p-4 rounded-xl border border-stone-200 shadow-sm hover:shadow-md hover:border-yellow-400 transition-all group">
                     <div className="flex justify-between items-start gap-4">
                       <div>
-                        <h3 className="font-bold text-red-900 group-hover:text-red-700">{s.title}</h3>
+                        <h3 className="font-bold text-stone-900 group-hover:text-red-700">{s.title}</h3>
                         <p className="text-sm text-stone-600 mt-1 leading-relaxed">{s.description}</p>
                       </div>
                       <button 
                         onClick={() => onSelect(s.title, s.description)}
-                        className="shrink-0 bg-yellow-50 text-yellow-700 px-3 py-1.5 rounded-lg text-xs font-bold border border-yellow-200 hover:bg-yellow-400 hover:text-red-900 hover:border-yellow-400 transition-all flex items-center gap-1"
+                        className="shrink-0 bg-yellow-50 text-yellow-700 px-3 py-1.5 rounded-lg text-xs font-bold border border-yellow-200 hover:bg-yellow-400 hover:text-stone-900 hover:border-yellow-400 transition-all flex items-center gap-1"
                       >
                         <span>+</span> Chọn
                       </button>
@@ -89,7 +90,7 @@ export const TaskSuggestionModal: React.FC<TaskSuggestionModalProps> = ({ isOpen
         <div className="p-4 bg-white border-t border-stone-100 flex justify-between items-center">
            <p className="text-xs text-stone-400 italic">Được hỗ trợ bởi Google Gemini AI</p>
            <div className="flex gap-2">
-             <Button variant="ghost" onClick={loadSuggestions} disabled={isLoading} icon={<span className="text-lg">↻</span>}>Làm mới</Button>
+             <Button variant="ghost" onClick={loadSuggestions} disabled={isLoading} icon={<RotateCw className="w-4 h-4" />}>Làm mới</Button>
              <Button variant="secondary" onClick={onClose}>Đóng</Button>
            </div>
         </div>

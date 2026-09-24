@@ -1,22 +1,33 @@
 {
-  "name": "Công An Phường Nam Đông Hà",
+  "name": "Công an phường Nam Đông Hà",
   "short_name": "CAP Nam Đông Hà",
-  "description": "Hệ thống quản lý, phân công công việc CAP Nam Đông Hà - Quảng Trị",
-  "start_url": "/",
+  "description": "Giao việc, điểm danh hội nghị và thông báo nội bộ – Công an phường Nam Đông Hà",
+  "start_url": "/?source=pwa",
   "display": "standalone",
-  "background_color": "#fff7ed",
-  "theme_color": "#7f1d1d",
+  "background_color": "#eef0f4",
+  "theme_color": "#ffffff",
   "orientation": "portrait",
   "icons": [
     {
-      "src": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSMAT1EEiTjShLjCbC_DbVGPRAXHcbA_IZNww&s",
+      "src": "/icon-192.png",
       "sizes": "192x192",
-      "type": "image/svg+xml"
+      "type": "image/png",
+      "purpose": "any"
     },
     {
-      "src": "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSMAT1EEiTjShLjCbC_DbVGPRAXHcbA_IZNww&s",
+      "src": "/icon-512.png",
       "sizes": "512x512",
-      "type": "image/svg+xml"
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
-  ]
+  ],
+  "id": "/",
+  "lang": "vi",
+  "scope": "/"
 }

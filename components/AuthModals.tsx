@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { X, Mail, CheckCircle2, KeyRound } from 'lucide-react';
 import { Button, Input } from './UI';
 import { MockDB } from '../services/mockDatabase';
 
@@ -18,7 +19,7 @@ const OtpInput: React.FC<{ value: string; onChange: (v: string) => void; disable
         onChange={e => onChange(e.target.value.replace(/\D/g, '').slice(0, 6))}
         placeholder="––––––"
         className="w-full text-center tracking-[0.6em] text-2xl font-bold py-3 border-2 border-stone-200 rounded-xl
-                   focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20 bg-white text-red-900"
+                   focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20 bg-white text-stone-900"
       />
     </div>
   );
@@ -38,13 +39,13 @@ const useCountdown = () => {
 const ModalShell: React.FC<{ title: string; subtitle: string; onClose: () => void; children: React.ReactNode }> =
   ({ title, subtitle, onClose, children }) => (
   <div className="fixed inset-0 z-[90] flex items-center justify-center bg-stone-900/70 backdrop-blur-sm p-4 animate-fade-in-up">
-    <div className="bg-white w-full max-w-md rounded-3xl shadow-2xl overflow-hidden border-t-4 border-red-700 flex flex-col max-h-[92vh]">
+    <div className="bg-white w-full max-w-md rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
       <div className="px-6 py-4 border-b border-stone-100 bg-red-50 flex justify-between items-start">
         <div>
-          <h2 className="text-lg font-bold text-red-900">{title}</h2>
+          <h2 className="text-lg font-bold text-stone-900">{title}</h2>
           <p className="text-xs text-red-700/80 mt-0.5">{subtitle}</p>
         </div>
-        <button onClick={onClose} className="p-2 bg-white rounded-full text-stone-500 hover:text-red-600 shrink-0">✕</button>
+        <button onClick={onClose} aria-label="Đóng" className="p-2 rounded-lg text-stone-400 hover:bg-stone-100 hover:text-stone-700 shrink-0"><X className="w-5 h-5" /></button>
       </div>
       <div className="p-6 overflow-y-auto space-y-4">{children}</div>
     </div>
@@ -144,7 +145,7 @@ export const RegisterModal: React.FC<{ isOpen: boolean; onClose: () => void }> =
       {step === 'OTP' && (
         <>
           <div className="text-center">
-            <div className="w-14 h-14 mx-auto mb-3 bg-red-50 rounded-full flex items-center justify-center text-3xl">✉️</div>
+            <div className="w-11 h-11 mx-auto mb-3 bg-stone-100 text-stone-700 rounded-lg flex items-center justify-center"><Mail className="w-5 h-5" /></div>
             <p className="text-sm text-stone-600">
               Nhập mã 6 số vừa gửi tới <span className="font-bold text-red-800">{maskedEmail}</span>
             </p>
@@ -166,7 +167,7 @@ export const RegisterModal: React.FC<{ isOpen: boolean; onClose: () => void }> =
 
       {step === 'DONE' && (
         <div className="text-center py-4">
-          <div className="w-16 h-16 mx-auto mb-4 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-3xl">✓</div>
+          <div className="w-11 h-11 mx-auto mb-4 bg-emerald-50 text-emerald-700 rounded-lg flex items-center justify-center"><CheckCircle2 className="w-6 h-6" /></div>
           <h3 className="font-bold text-green-700 text-lg">Xác thực email thành công!</h3>
           <p className="text-sm text-stone-500 mt-2 mb-6 leading-relaxed">
             {requireApproval
@@ -270,7 +271,7 @@ export const ForgotPasswordModal: React.FC<{ isOpen: boolean; onClose: () => voi
       {step === 'OTP' && (
         <>
           <div className="text-center">
-            <div className="w-14 h-14 mx-auto mb-3 bg-red-50 rounded-full flex items-center justify-center text-3xl">🔐</div>
+            <div className="w-11 h-11 mx-auto mb-3 bg-stone-100 text-stone-700 rounded-lg flex items-center justify-center"><KeyRound className="w-5 h-5" /></div>
             <p className="text-sm text-stone-600">
               Nhập mã 6 số vừa gửi tới <span className="font-bold text-red-800">{maskedEmail || 'email đã đăng ký'}</span>
             </p>
@@ -300,7 +301,7 @@ export const ForgotPasswordModal: React.FC<{ isOpen: boolean; onClose: () => voi
 
       {step === 'DONE' && (
         <div className="text-center py-4">
-          <div className="w-16 h-16 mx-auto mb-4 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-3xl">✓</div>
+          <div className="w-11 h-11 mx-auto mb-4 bg-emerald-50 text-emerald-700 rounded-lg flex items-center justify-center"><CheckCircle2 className="w-6 h-6" /></div>
           <h3 className="font-bold text-green-700 text-lg">Đã đổi mật khẩu!</h3>
           <p className="text-sm text-stone-500 mt-2 mb-6">Đồng chí có thể đăng nhập bằng mật khẩu mới.</p>
           <Button onClick={onClose} className="w-full py-3">Về trang đăng nhập</Button>
