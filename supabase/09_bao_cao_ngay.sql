@@ -258,6 +258,7 @@ BEGIN
     END IF;
   END LOOP;
   RETURN jsonb_build_object('ok', true,
+    'v', 3,                         -- phiên bản hàm máy chủ (ứng dụng dùng để phát hiện máy chủ chưa cập nhật)
     'currentDay', d,
     'deadline', to_char(daily_deadline_time(), 'HH24:MI'),
     'deadlineAt', (extract(epoch FROM daily_deadline_at(d)) * 1000)::bigint,
