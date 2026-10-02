@@ -407,7 +407,9 @@ export interface DailyIncident {
   key: string;               // giữ nguyên qua các phiên bản (để gộp trùng)
   day?: string;
   unit?: DailyUnit;
+  kind?: string | null;      // loại: Hình sự | Hành chính
   field: string;             // lĩnh vực
+  suspectInfo?: string | null; // thông tin đối tượng (mỗi dòng 1 người)
   severity?: string | null;
   occurredAt?: string | null;
   location?: string | null;
