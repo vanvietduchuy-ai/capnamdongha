@@ -60,7 +60,7 @@ export const DailyHub: React.FC<Props> = ({ currentUser, openUnit, onOpened }) =
   const leaderOf = me.leaderOf || [];
   const canBoard = canManage || leaderOf.length > 0;
   // Máy chủ còn chạy bản SQL cũ (phân công cố định) → cán bộ không báo cáo được
-  const oldServer = fresh && !(Number((me as any).v) >= 3);
+  const oldServer = fresh && !(Number((me as any).v) >= 4);
 
   if (form) {
     return <DailyForm me={currentUser} day={form.day} unit={form.unit} reported={form.reported} deadline={deadline} clockOffset={offset}

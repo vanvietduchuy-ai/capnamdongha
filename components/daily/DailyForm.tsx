@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, CheckCircle2, ChevronDown, ChevronLeft, History, Loader2, Minus, Plus, Siren, Trash2, X, Zap } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, ChevronDown, ChevronLeft, History, Loader2, Minus, Plus, Search, Siren, Trash2, X, Zap } from 'lucide-react';
 import { DailyIncident, DailyOtherIncident, DailyReport, DailyStatus, DailyUnit, User } from '../../types';
 import {
-  blankIncident, Daily, DailyGet, dayShort, FIELDS, HANDLINGS, incidentError, SEVERITIES, unitName, vnDateTime, vnTime
+  blankIncident, Daily, DailyGet, dayShort, FIELDS, HANDLINGS, incidentError, KINDS, noAccent, parseIncidentText, SEVERITIES, unitName, vnDateTime, vnTime
 } from '../../services/dailyReportService';
 import { btnPrimary, btnSecondary, card, Chip, Sheet } from '../learning/common';
 import { HistorySheet } from './DailyBoard';
@@ -226,7 +226,7 @@ export const DailyForm: React.FC<Props> = ({ day, unit, deadline, clockOffset, r
           {needReason && (
             <div>
               <label className={lbl}>Lý do đính chính *</label>
-              <input className={inBig} value={reason} onChange={e => setReason(e.target.value)} placeholder="VD: Bổ sung vụ việc tiếp nhận sau" data-testid="daily-reason" />
+              <input className={inBig} value={reason} onChange={e => setReason(e.target.value)} data-testid="daily-reason" />
             </div>
           )}
         </div>
@@ -272,14 +272,40 @@ const Stepper: React.FC<{ label: string; value: number; min?: number; disabled?:
     </div>
   );
 
-/** Nhập 1 vụ việc: phần bắt buộc hiện sẵn, chi tiết khác thu gọn */
+/** Nhập 1 vụ việc: loại, lĩnh vực (có tìm kiếm), nội dung; hệ thống tự đọc số đối tượng, thông tin đối tượng, thời gian, địa điểm */
 export const IncidentEdit: React.FC<{
   id?: string; n: number; i: DailyIncident; others: DailyOtherIncident[]; isFlash?: boolean; disabled?: boolean;
   onChange: (p: Partial<DailyIncident>) => void; onRemove?: () => void;
 }> = ({ id, n, i, others, isFlash, disabled, onChange, onRemove }) => {
-  const filled = !!(i.severity || i.occurredAt || i.location || i.damage || i.handling || i.handlingNote || i.victims || i.dupOf);
+  const filled = !!(i.severity || i.damage || i.handling || i.handlingNote || i.victims || i.dupOf);
   const [more, setMore] = useState(filled);
+  const [q, setQ] = useState('');
+  const [pickField, setPickField] = useState(!i.field);
+  // Trường người dùng đã tự sửa thì không tự điền đè nữa
+  const manual = useRef<{ suspects: boolean; info: boolean; time: boolean; place: boolean }>({
+    suspects: false, info: !!i.suspectInfo, time: !!i.occurredAt, place: !!i.location
+  });
+  const [auto, setAuto] = useState(false);
   const idWarn = incidentError(i)?.startsWith('Có dãy số');
+
+  // Tự đọc nội dung (0,5 giây sau khi ngừng gõ)
+  useEffect(() => {
+    if (disabled || (i.summary || '').trim().length < 10) return;
+    const t = window.setTimeout(() => {
+      const p = parseIncidentText(i.summary);
+      const patch: Partial<DailyIncident> = {};
+      if (!manual.current.suspects && p.suspects > 0 && p.suspects !== i.suspects) patch.suspects = p.suspects;
+      if (!manual.current.info && p.suspectInfo && p.suspectInfo !== (i.suspectInfo || '')) patch.suspectInfo = p.suspectInfo;
+      if (!manual.current.time && p.occurredAt && p.occurredAt !== (i.occurredAt || '')) patch.occurredAt = p.occurredAt;
+      if (!manual.current.place && p.location && p.location !== (i.location || '')) patch.location = p.location;
+      if (Object.keys(patch).length) { onChange(patch); setAuto(true); }
+    }, 500);
+    return () => window.clearTimeout(t);
+  }, [i.summary]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const fields = q.trim() ? FIELDS.filter(f => noAccent(f).includes(noAccent(q.trim()))) : FIELDS;
+  const autoTag = auto ? <span className="ml-1.5 text-[11px] font-semibold text-blue-700 bg-blue-50 rounded px-1.5 py-0.5">tự điền</span> : null;
+
   return (
     <div id={id} className={`${card} p-3.5`} data-testid="daily-incident-card">
       <div className="flex items-center gap-2 mb-2.5">
@@ -288,39 +314,69 @@ export const IncidentEdit: React.FC<{
         {onRemove && !disabled && <button className="ml-auto p-2 -mr-1 rounded-lg text-stone-400 hover:text-red-700 hover:bg-red-50" onClick={onRemove} aria-label="Xoá vụ việc"><Trash2 className="w-5 h-5" /></button>}
       </div>
 
-      <label className={lbl}>Lĩnh vực *</label>
-      <div className="grid grid-cols-2 gap-1.5 mb-3" role="radiogroup" aria-label="Lĩnh vực" data-testid="inc-field">
-        {FIELDS.map(f => (
-          <button key={f} type="button" role="radio" aria-checked={i.field === f} disabled={disabled} onClick={() => onChange({ field: f })}
-            className={`min-h-11 px-2.5 py-1.5 rounded-xl border text-left text-[14px] leading-snug ${i.field === f ? 'border-brand-700 bg-brand-50 text-brand-800 font-semibold' : 'border-stone-200 bg-white text-stone-700'}`}>{f}</button>
+      <label className={lbl}>Loại *</label>
+      <div className="grid grid-cols-2 gap-2 mb-3" role="radiogroup" aria-label="Loại vụ việc" data-testid="inc-kind">
+        {KINDS.map(k => (
+          <button key={k} type="button" role="radio" aria-checked={i.kind === k} disabled={disabled} onClick={() => onChange({ kind: k })}
+            className={`h-12 rounded-xl border-2 font-bold text-[15px] ${i.kind === k ? 'border-brand-700 bg-brand-50 text-brand-800' : 'border-stone-200 bg-white text-stone-700'}`}>{k}</button>
         ))}
       </div>
 
+      <label className={lbl}>Lĩnh vực *</label>
+      {i.field && !pickField ? (
+        <div className="flex items-center gap-2 mb-3">
+          <div className="flex-1 min-h-12 px-3 py-2 rounded-xl border-2 border-brand-700 bg-brand-50 text-brand-800 font-semibold text-[15px] flex items-center">{i.field}</div>
+          {!disabled && <button type="button" className={`${btnSecondary} h-12`} onClick={() => { setPickField(true); setQ(''); }}>Đổi</button>}
+        </div>
+      ) : (
+        <div className="mb-3">
+          <div className="relative mb-2">
+            <Search className="w-4 h-4 text-stone-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            <input className={`${inBig} pl-9`} value={q} onChange={e => setQ(e.target.value)} placeholder="Tìm lĩnh vực" disabled={disabled} data-testid="inc-field-search" />
+          </div>
+          <div className="grid grid-cols-2 gap-1.5" role="radiogroup" aria-label="Lĩnh vực" data-testid="inc-field">
+            {fields.map(f => (
+              <button key={f} type="button" role="radio" aria-checked={i.field === f} disabled={disabled} onClick={() => { onChange({ field: f }); setPickField(false); setQ(''); }}
+                className={`min-h-11 px-2.5 py-1.5 rounded-xl border text-left text-[14px] leading-snug ${i.field === f ? 'border-brand-700 bg-brand-50 text-brand-800 font-semibold' : 'border-stone-200 bg-white text-stone-700'}`}>{f}</button>
+            ))}
+            {fields.length === 0 && <div className="col-span-2 text-[14px] text-stone-500 py-2">Không thấy — chọn "Khác".</div>}
+          </div>
+        </div>
+      )}
+
       <label className={lbl}>Nội dung vụ việc *</label>
-      <textarea className={`${inBig} h-32 py-2.5 leading-relaxed`} value={i.summary} onChange={e => onChange({ summary: e.target.value })} disabled={disabled} data-testid="inc-summary"
-        placeholder="Tóm tắt diễn biến. Không ghi họ tên, số CCCD, số điện thoại." />
+      <textarea className={`${inBig} h-36 py-2.5 leading-relaxed`} value={i.summary} onChange={e => onChange({ summary: e.target.value })} disabled={disabled} data-testid="inc-summary" />
 
       <div className="grid grid-cols-2 gap-2.5 mt-3">
         <Stepper label="Số vụ việc *" value={i.cases} min={1} disabled={disabled} onChange={v => onChange({ cases: v })} testId="inc-cases" />
-        <Stepper label="Số đối tượng" value={i.suspects} disabled={disabled} onChange={v => onChange({ suspects: v })} testId="inc-suspects" />
+        <Stepper label="Số đối tượng" value={i.suspects} disabled={disabled} onChange={v => { manual.current.suspects = true; onChange({ suspects: v }); }} testId="inc-suspects" />
+      </div>
+
+      <div className="mt-3">
+        <label className={lbl}>Thông tin đối tượng{i.suspectInfo ? autoTag : null}</label>
+        <textarea className={`${inBig} h-24 py-2.5 leading-relaxed`} value={i.suspectInfo || ''} disabled={disabled} data-testid="inc-suspect-info"
+          onChange={e => { manual.current.info = true; onChange({ suspectInfo: e.target.value }); }} />
+      </div>
+
+      <div className="grid grid-cols-2 gap-2.5 mt-3">
+        <div><label className={lbl}>Thời gian</label><input className={inBig} value={i.occurredAt || ''} disabled={disabled}
+          onChange={e => { manual.current.time = true; onChange({ occurredAt: e.target.value }); }} /></div>
+        <div><label className={lbl}>Địa điểm</label><input className={inBig} value={i.location || ''} disabled={disabled}
+          onChange={e => { manual.current.place = true; onChange({ location: e.target.value }); }} /></div>
       </div>
 
       {!more ? (
         <button type="button" className="mt-3 text-[14px] font-semibold text-stone-600 inline-flex items-center gap-1 h-9" onClick={() => setMore(true)}>
-          <ChevronDown className="w-4 h-4" />Thêm chi tiết (không bắt buộc)</button>
+          <ChevronDown className="w-4 h-4" />Thêm chi tiết</button>
       ) : (
         <div className="mt-3 pt-3 border-t border-stone-100 space-y-2.5">
-          <div className="grid grid-cols-2 gap-2.5">
-            <div><label className={lbl}>Thời gian</label><input className={inBig} value={i.occurredAt || ''} onChange={e => onChange({ occurredAt: e.target.value })} disabled={disabled} placeholder="21h30 02/10" /></div>
-            <div><label className={lbl}>Địa điểm</label><input className={inBig} value={i.location || ''} onChange={e => onChange({ location: e.target.value })} disabled={disabled} placeholder="TDP 3" /></div>
-          </div>
           <div className="grid grid-cols-2 gap-2.5">
             <div><label className={lbl}>Mức độ</label>
               <select className={inBig} value={i.severity || ''} onChange={e => onChange({ severity: e.target.value })} disabled={disabled}>
                 <option value="">—</option>{SEVERITIES.map(f => <option key={f}>{f}</option>)}</select></div>
             <Stepper label="Bị hại, thương vong" value={i.victims} disabled={disabled} onChange={v => onChange({ victims: v })} />
           </div>
-          <div><label className={lbl}>Thiệt hại</label><input className={inBig} value={i.damage || ''} onChange={e => onChange({ damage: e.target.value })} disabled={disabled} placeholder="1 xe máy, khoảng 30 triệu đồng" /></div>
+          <div><label className={lbl}>Thiệt hại</label><input className={inBig} value={i.damage || ''} onChange={e => onChange({ damage: e.target.value })} disabled={disabled} /></div>
           <div><label className={lbl}>Tình trạng xử lý</label>
             <select className={inBig} value={i.handling || ''} onChange={e => onChange({ handling: e.target.value })} disabled={disabled}>
               <option value="">—</option>{HANDLINGS.map(f => <option key={f}>{f}</option>)}</select></div>
@@ -346,13 +402,14 @@ export const IncidentView: React.FC<{ i: DailyIncident; n: number; others?: Dail
   return (
     <div className={`border-t border-stone-100 pt-2.5 mt-2.5 text-[15px] ${dup ? 'opacity-60' : ''}`} data-testid="daily-incident-view">
       <div className="flex flex-wrap items-center gap-1.5 mb-0.5">
-        <b className="text-stone-900">{n}. {i.field}</b>
+        <b className="text-stone-900">{n}. {i.kind ? `${i.kind} – ` : ''}{i.field}</b>
         {i.severity && <Chip tone={/Rất|Đặc biệt/.test(i.severity) ? 'red' : 'amber'}>{i.severity}</Chip>}
         {i.flash && <Chip tone="red">Báo nhanh</Chip>}
         {dup && <Chip>Trùng: {typeof dup === 'string' ? dup : `${dup.unitName}`}</Chip>}
       </div>
       {(i.occurredAt || i.location) && <div className="text-[13px] text-stone-500">{[i.occurredAt, i.location].filter(Boolean).join(' · ')}</div>}
       <div className="text-stone-800 whitespace-pre-line">{i.summary}</div>
+      {i.suspectInfo && <div className="text-[13px] text-stone-700 mt-0.5 whitespace-pre-line"><b>Đối tượng:</b> {i.suspectInfo}</div>}
       <div className="text-[13px] text-stone-600 mt-0.5">
         <b>{i.cases}</b> vụ · <b>{i.suspects}</b> đối tượng{i.victims ? <> · <b>{i.victims}</b> bị hại</> : null}
         {i.damage ? ` · Thiệt hại: ${i.damage}` : ''}{i.handling ? ` · ${i.handling}` : ''}{i.handlingNote ? ` – ${i.handlingNote}` : ''}
