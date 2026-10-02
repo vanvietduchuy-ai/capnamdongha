@@ -34,12 +34,18 @@ export const LessonReader: React.FC<Props> = ({ lesson, chapterLabel, progress, 
   const lastAct = useRef(Date.now());
   const playing = useRef(false);
   const sending = useRef(false);
+  const [counting, setCounting] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const videoDoneRef = useRef(false);
   const onProgRef = useRef(onProgress); onProgRef.current = onProgress;
 
   const tracked = !!lesson.videoUrl && lesson.videoKind !== 'DRIVE';
   const seconds = (prog?.seconds || 0) + pending;
   const timeOk = seconds >= lesson.minSeconds;
   const videoOk = !tracked || Math.max(videoPct, prog?.videoPct || 0) >= 90;
+  // Bài có video (đo được) mà chưa xem đủ: chỉ tính giờ khi video đang phát.
+  // Xem đủ video rồi thì đọc phần chữ (cuộn, chạm, gõ phím) mới được tính tiếp.
+  videoDoneRef.current = !tracked || videoOk;
   const ready = timeOk && videoOk;
   const done = !!prog?.completed;
 
@@ -58,11 +64,13 @@ export const LessonReader: React.FC<Props> = ({ lesson, chapterLabel, progress, 
 
   useEffect(() => {
     const act = () => { lastAct.current = Date.now(); };
-    const evs = ['pointerdown', 'keydown', 'touchstart', 'wheel', 'scroll', 'mousemove'];
+    // Rê chuột không tính là đang học (tránh đồng hồ chạy khi chỉ để chuột trên trang)
+    const evs = ['pointerdown', 'keydown', 'touchstart', 'wheel', 'scroll'];
     evs.forEach(e => window.addEventListener(e, act, { passive: true, capture: true }));
     const tick = window.setInterval(() => {
-      const active = document.visibilityState === 'visible' && document.hasFocus?.() !== false
-        && (playing.current || Date.now() - lastAct.current < IDLE_MS);
+      const visible = document.visibilityState === 'visible' && document.hasFocus?.() !== false;
+      const active = visible && (playing.current || (videoDoneRef.current && Date.now() - lastAct.current < IDLE_MS));
+      setCounting(c => c === active ? c : active);
       if (active) { pendingRef.current += 1; setPending(pendingRef.current); }
     }, 1000);
     const beat = window.setInterval(() => sendRef.current(), BEAT_MS);
@@ -102,7 +110,7 @@ export const LessonReader: React.FC<Props> = ({ lesson, chapterLabel, progress, 
 
       {lesson.videoUrl && lesson.videoKind && (
         <div className="mb-4">
-          <VideoPlayer url={lesson.videoUrl} kind={lesson.videoKind} initialPct={prog?.videoPct || 0} onProgress={onVideoPct} onPlaying={p => { playing.current = p; if (p) lastAct.current = Date.now(); }} />
+          <VideoPlayer url={lesson.videoUrl} kind={lesson.videoKind} initialPct={prog?.videoPct || 0} onProgress={onVideoPct} onPlaying={p => { playing.current = p; setIsPlaying(p); if (p) { lastAct.current = Date.now(); setCounting(true); } else if (!videoDoneRef.current) setCounting(false); }} />
         </div>
       )}
 
@@ -121,7 +129,9 @@ export const LessonReader: React.FC<Props> = ({ lesson, chapterLabel, progress, 
       <div className="sticky bottom-0 md:bottom-2 mt-4 -mx-3 md:mx-0 bg-white/95 backdrop-blur border-t md:border md:rounded-xl border-stone-200 px-3 md:px-4 py-3 z-10"
         style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}>
         <div className="flex items-center gap-3 text-[13px] text-stone-600 mb-2">
-          <span className="inline-flex items-center gap-1" data-testid="study-time"><Clock className="w-4 h-4" />Đã học <b className="text-stone-900 tabular">{fmtDur(seconds)}</b>{lesson.minSeconds > 0 && <> / tối thiểu {fmtDur(lesson.minSeconds)}</>}</span>
+          <span className={`inline-flex items-center gap-1 ${counting ? '' : 'opacity-60'}`} data-testid="study-time" data-counting={counting ? '1' : '0'}
+            title={counting ? 'Đang tính thời gian học' : 'Tạm dừng tính giờ'}><Clock className={`w-4 h-4 ${counting ? 'text-emerald-600' : ''}`} />Đã học <b className="text-stone-900 tabular">{fmtDur(seconds)}</b>{lesson.minSeconds > 0 && <> / tối thiểu {fmtDur(lesson.minSeconds)}</>}
+            {!counting && !done && <span className="ml-1 text-amber-700 font-semibold" data-testid="time-paused">· {tracked && !videoOk && !isPlaying ? 'Video đang dừng — không tính giờ' : 'Tạm dừng tính giờ'}</span>}</span>
           {tracked && <span className="ml-auto" data-testid="video-pct">Đã xem <b className="text-stone-900">{Math.max(videoPct, prog?.videoPct || 0)}%</b> video</span>}
         </div>
         <div className="flex gap-2">
