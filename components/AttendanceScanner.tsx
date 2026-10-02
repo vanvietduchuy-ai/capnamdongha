@@ -231,6 +231,11 @@ export const AttendanceScanner: React.FC<AttendanceScannerProps> = ({ currentUse
           return;
       }
 
+      if (parsed.sessionId.startsWith('exm_')) {
+          setError("Đây là mã QR phòng thi. Vào mục \"Học tập & Thi\" → Thi, chọn kỳ thi rồi quét mã để vào làm bài.");
+          return;
+      }
+
       // Tìm đúng phiên theo mã đã quét (hỗ trợ nhiều hội nghị diễn ra cùng lúc)
       const session = await MockDB.getSessionById(parsed.sessionId);
       if (!session) {

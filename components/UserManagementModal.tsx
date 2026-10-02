@@ -739,7 +739,7 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
                                  perm === UserPermission.MANAGE_WEEKLY_CALENDAR ? 'Quản lý Lịch' :
                                  perm === UserPermission.VIEW_WEEKLY_CALENDAR ? 'Xem Lịch' :
                                  perm === UserPermission.MANAGE_UTILITIES ? 'Quản lý Tiện ích' :
-                                 perm === UserPermission.MANAGE_ATTENDANCE ? 'Quản lý Điểm danh' : 
+                                 perm === UserPermission.MANAGE_ATTENDANCE ? 'Quản lý Điểm danh' : perm === UserPermission.MANAGE_LEARNING ? 'Học tập & Thi' : 
                                  perm === UserPermission.MANAGE_TASKS ? 'Quản lý Nhiệm vụ' :
                                  perm === UserPermission.VIEW_ALL_TASKS ? 'Xem toàn bộ NV' :
                                  perm === UserPermission.MANAGE_PROPOSALS ? 'Quản lý Đề xuất' : perm}
@@ -824,9 +824,9 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
             // Auto-assign permissions based on role
             let defaultPerms: UserPermission[] = [];
             if (newRole === UserRole.CHIEF) {
-                defaultPerms = [UserPermission.MANAGE_USERS, UserPermission.ASSIGN_TASKS, UserPermission.VIEW_STATISTICS, UserPermission.MANAGE_UTILITIES, UserPermission.MANAGE_ATTENDANCE, UserPermission.MANAGE_TASKS, UserPermission.VIEW_ALL_TASKS, UserPermission.MANAGE_PROPOSALS];
+                defaultPerms = [UserPermission.MANAGE_USERS, UserPermission.ASSIGN_TASKS, UserPermission.VIEW_STATISTICS, UserPermission.MANAGE_UTILITIES, UserPermission.MANAGE_ATTENDANCE, UserPermission.MANAGE_LEARNING, UserPermission.MANAGE_TASKS, UserPermission.VIEW_ALL_TASKS, UserPermission.MANAGE_PROPOSALS];
             } else if (newRole === UserRole.DEPUTY_CHIEF) {
-                defaultPerms = [UserPermission.ASSIGN_TASKS, UserPermission.VIEW_STATISTICS, UserPermission.MANAGE_UTILITIES, UserPermission.MANAGE_ATTENDANCE, UserPermission.MANAGE_TASKS, UserPermission.VIEW_ALL_TASKS, UserPermission.MANAGE_PROPOSALS];
+                defaultPerms = [UserPermission.ASSIGN_TASKS, UserPermission.VIEW_STATISTICS, UserPermission.MANAGE_UTILITIES, UserPermission.MANAGE_ATTENDANCE, UserPermission.MANAGE_LEARNING, UserPermission.MANAGE_TASKS, UserPermission.VIEW_ALL_TASKS, UserPermission.MANAGE_PROPOSALS];
             } else if (newRole === UserRole.MANAGER || newRole === UserRole.DEPUTY) {
                 defaultPerms = [UserPermission.ASSIGN_TASKS, UserPermission.VIEW_STATISTICS, UserPermission.MANAGE_UTILITIES];
             }
@@ -914,7 +914,7 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
                                  perm === UserPermission.ASSIGN_TASKS ? 'Giao việc & Phân công' :
                                  perm === UserPermission.VIEW_STATISTICS ? 'Xem Thống kê & Báo cáo' :
                                  perm === UserPermission.MANAGE_UTILITIES ? 'Quản lý Tiện ích' :
-                                 perm === UserPermission.MANAGE_ATTENDANCE ? 'Quản lý Điểm danh' : 
+                                 perm === UserPermission.MANAGE_ATTENDANCE ? 'Quản lý Điểm danh' : perm === UserPermission.MANAGE_LEARNING ? 'Học tập & Thi' : 
                                  perm === UserPermission.MANAGE_TASKS ? 'Quản lý toàn bộ nhiệm vụ' :
                                  perm === UserPermission.VIEW_ALL_TASKS ? 'Xem toàn bộ nhiệm vụ' :
                                  perm === UserPermission.MANAGE_PROPOSALS ? 'Quản lý đề xuất' : perm}
