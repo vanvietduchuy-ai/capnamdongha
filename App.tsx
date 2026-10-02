@@ -9,6 +9,7 @@ import { CloudSyncModal } from './components/CloudSyncModal';
 const RemindModal = lazy(() => import('./components/RemindModal').then(m => ({ default: m.RemindModal })));
 const CalendarView = lazy(() => import('./components/CalendarView').then(m => ({ default: m.CalendarView })));
 const MeetingManager = lazy(() => import('./components/MeetingManager').then(m => ({ default: m.MeetingManager })));
+const LearningHub = lazy(() => import('./components/learning/LearningHub').then(m => ({ default: m.LearningHub })));
 const AttendanceScanner = lazy(() => import('./components/AttendanceScanner').then(m => ({ default: m.AttendanceScanner })));
 const AbsenceReport = lazy(() => import('./components/AbsenceReport').then(m => ({ default: m.AbsenceReport })));
 import { GuestCheckIn } from './components/GuestCheckIn';
@@ -19,7 +20,7 @@ import { INSTALL_PATH } from './lib/install';
 import {
   Home, ClipboardList, QrCode, CalendarDays, Map as MapIcon, LayoutGrid, Inbox, Users, Download,
   KeyRound, LogOut, RefreshCw, Bell, BellOff, Menu, X, ChevronRight, Settings2, Plus, FileSpreadsheet,
-  ImageDown, AlertTriangle, Clock, CheckCircle2, Link2, Repeat, Pencil, MessageSquareQuote, FolderOpen, Zap
+  ImageDown, AlertTriangle, Clock, CheckCircle2, Link2, Repeat, Pencil, MessageSquareQuote, FolderOpen, Zap, GraduationCap
 } from 'lucide-react';
 
 const MapDuty = lazy(() => import('./components/MapDuty/MapDuty').then(module => ({ default: module.MapDuty })));
@@ -102,6 +103,8 @@ const hasPermission = (user: User | null, permission: UserPermission): boolean =
       return isLeader(user.role);
     case UserPermission.MANAGE_ATTENDANCE:
       return user.role === UserRole.CHIEF || user.role === UserRole.DEPUTY_CHIEF; // Admin, Ban chỉ huy, or explicitly permitted users
+    case UserPermission.MANAGE_LEARNING:
+      return user.role === UserRole.CHIEF || user.role === UserRole.DEPUTY_CHIEF;
     case UserPermission.MANAGE_MAP_DUTY:
       return false; // Only Admin by default as requested
     default:
@@ -109,7 +112,7 @@ const hasPermission = (user: User | null, permission: UserPermission): boolean =
   }
 };
 
-type ViewState = 'HOME' | 'DASHBOARD' | 'PROPOSALS' | 'CALENDAR' | 'UTILITIES' | 'ATTENDANCE' | 'MAP_DUTY';
+type ViewState = 'HOME' | 'DASHBOARD' | 'PROPOSALS' | 'CALENDAR' | 'UTILITIES' | 'ATTENDANCE' | 'MAP_DUTY' | 'LEARNING';
 
 // Updated Default Utilities - Empty as requested
 const DEFAULT_UTILITIES: Utility[] = [];
@@ -138,7 +141,7 @@ const ToastNotification: React.FC<{ title: string; message: string; type?: strin
 /** Màu khối biểu tượng của từng module (kiểu khối 3D) */
 const MODULE_COLOR: Record<string, string> = {
   HOME: '#475569', DASHBOARD: '#c1121f', ATTENDANCE: '#0f766e', CALENDAR: '#1d4ed8', MAP_DUTY: '#b45309',
-  UTILITIES: '#6d28d9', PROPOSALS: '#0369a1', USERS: '#374151', INSTALL: '#15803d'
+  UTILITIES: '#6d28d9', PROPOSALS: '#0369a1', USERS: '#374151', INSTALL: '#15803d', LEARNING: '#7c2d12'
 };
 
 const VIEW_META: Record<string, { title: string; subtitle: string }> = {
@@ -148,7 +151,8 @@ const VIEW_META: Record<string, { title: string; subtitle: string }> = {
   CALENDAR: { title: 'Lịch cá nhân', subtitle: 'Lịch làm việc, lịch trực và sự kiện' },
   UTILITIES: { title: 'Tiện ích', subtitle: 'Công cụ và liên kết hỗ trợ nghiệp vụ' },
   ATTENDANCE: { title: 'Điểm danh hội nghị', subtitle: 'Tạo hội nghị, điểm danh bằng mã QR và báo cáo vắng mặt' },
-  MAP_DUTY: { title: 'Sơ đồ bảo vệ', subtitle: 'Phân công và theo dõi vị trí các chốt' }
+  MAP_DUTY: { title: 'Sơ đồ bảo vệ', subtitle: 'Phân công và theo dõi vị trí các chốt' },
+  LEARNING: { title: 'Học tập & Thi', subtitle: 'Khoá học, bài học, thi trắc nghiệm có chống gian lận' }
 };
 
 const App: React.FC = () => {
@@ -1218,6 +1222,7 @@ const App: React.FC = () => {
     const modules: { label: string; short?: string; desc: string; icon: React.ElementType; onClick: () => void; show?: boolean; c: string }[] = [
       { c: MODULE_COLOR.DASHBOARD, label: 'Sổ giao việc', desc: 'Giao việc, theo dõi tiến độ và hạn xử lý', icon: ClipboardList, onClick: () => goTo('DASHBOARD') },
       { c: MODULE_COLOR.ATTENDANCE, short: 'Điểm danh', label: 'Điểm danh hội nghị', desc: 'Quét mã QR, tạo hội nghị, báo cáo vắng mặt', icon: QrCode, onClick: () => goTo('ATTENDANCE') },
+      { c: MODULE_COLOR.LEARNING, short: 'Học tập & Thi', label: 'Học tập & Thi', desc: 'Học bài theo khoá, thi trắc nghiệm trực tuyến', icon: GraduationCap, onClick: () => goTo('LEARNING') },
       { c: MODULE_COLOR.CALENDAR, label: 'Lịch cá nhân', desc: 'Lịch trực, lịch họp và sự kiện quan trọng', icon: CalendarDays, onClick: () => goTo('CALENDAR') },
       { c: MODULE_COLOR.MAP_DUTY, label: 'Sơ đồ bảo vệ', desc: 'Phân công, theo dõi vị trí các chốt trên bản đồ', icon: MapIcon, onClick: () => goTo('MAP_DUTY') },
       { c: MODULE_COLOR.UTILITIES, label: 'Tiện ích', desc: 'Tra cứu văn bản, danh bạ và công cụ hỗ trợ', icon: LayoutGrid, onClick: () => goTo('UTILITIES') },
@@ -1363,6 +1368,7 @@ const App: React.FC = () => {
     { v: 'HOME', label: 'Trang chủ', icon: Home },
     { v: 'DASHBOARD', label: 'Sổ giao việc', icon: ClipboardList, badge: stats.overdue || undefined },
     { v: 'ATTENDANCE', label: 'Điểm danh hội nghị', icon: QrCode },
+    { v: 'LEARNING', label: 'Học tập & Thi', icon: GraduationCap },
     { v: 'CALENDAR', label: 'Lịch cá nhân', icon: CalendarDays },
     { v: 'MAP_DUTY', label: 'Sơ đồ bảo vệ', icon: MapIcon },
     { v: 'UTILITIES', label: 'Tiện ích', icon: LayoutGrid },
@@ -1644,6 +1650,8 @@ const App: React.FC = () => {
               )}
               </div>
            </div>
+        ) : currentView === 'LEARNING' ? (
+            <Suspense fallback={<LoadingBox />}><LearningHub currentUser={currentUser!} canManage={hasPermission(currentUser, UserPermission.MANAGE_LEARNING)} /></Suspense>
         ) : currentView === 'MAP_DUTY' ? (
             <Suspense fallback={<LoadingBox />}><MapDuty currentUser={currentUser!} users={users} isLeader={hasPermission(currentUser, UserPermission.MANAGE_MAP_DUTY)} /></Suspense>
         ) : (
@@ -1793,7 +1801,7 @@ const App: React.FC = () => {
             </button>
           );
         })}
-        <button onClick={() => setIsMobileMenuOpen(true)} className={`h-16 flex flex-col items-center justify-center gap-1 text-[11px] ${['MAP_DUTY', 'UTILITIES', 'PROPOSALS'].includes(currentView) ? 'text-brand-700 font-semibold' : 'text-stone-500'}`}>
+        <button onClick={() => setIsMobileMenuOpen(true)} className={`h-16 flex flex-col items-center justify-center gap-1 text-[11px] ${['MAP_DUTY', 'UTILITIES', 'PROPOSALS', 'LEARNING'].includes(currentView) ? 'text-brand-700 font-semibold' : 'text-stone-500'}`}>
           <Menu className="w-[22px] h-[22px]" strokeWidth={1.8} />Thêm
         </button>
       </nav>

@@ -6,7 +6,7 @@ Công an phường Nam Đông Hà · Dữ liệu lưu trên **Supabase** (Postgr
 
 ## 1. Cài đặt cơ sở dữ liệu (làm 1 lần, khoảng 5 phút)
 
-Vào dự án Supabase của đơn vị → **SQL Editor** → dán và chạy **đúng thứ tự** 7 file trong thư mục `supabase/`:
+Vào dự án Supabase của đơn vị → **SQL Editor** → dán và chạy **đúng thứ tự** 8 file trong thư mục `supabase/`:
 
 | Thứ tự | File | Nội dung |
 |---|---|---|
@@ -17,8 +17,10 @@ Vào dự án Supabase của đơn vị → **SQL Editor** → dán và chạy *
 | 5 | `05_hoi_nghi.sql` | Tạo hội nghị trước, chọn thành phần, **Bắt đầu / Kết thúc** điểm danh |
 | 6 | `06_ma_qr_dong.sql` | Mã QR có chữ ký máy chủ, đổi **3 giây/lần**, máy chủ kiểm tra từng lần quét |
 | 7 | `07_so_do_cho_ngoi.sql` | Sơ đồ chỗ ngồi, **Đối sánh sơ đồ chỗ ngồi**, đánh dấu nghi vấn |
+| 8 | `08_hoc_tap_thi.sql` | **Học tập & Thi**: ngân hàng câu hỏi, khoá học, bài học, kỳ thi chống gian lận, kho tệp `hoc-tap` |
 
-- Cả 7 file an toàn khi chạy lại. **Nếu chạy lại, luôn chạy đủ theo thứ tự.** Đặc biệt: đã chạy lại file 04 thì **bắt buộc chạy lại 05 và 06** ngay sau đó (nếu không, mã QR sẽ mất lớp kiểm tra chữ ký).
+- Cả 8 file an toàn khi chạy lại. **Nếu chạy lại, luôn chạy đủ theo thứ tự.** Đặc biệt: đã chạy lại file 04 thì **bắt buộc chạy lại 05 và 06** ngay sau đó (nếu không, mã QR sẽ mất lớp kiểm tra chữ ký).
+- Đơn vị đã chạy 01–07: chỉ cần chạy thêm **08_hoc_tap_thi.sql** (chạy lúc nào cũng được), rồi triển khai bản web mới.
 - Đơn vị đã chạy 01–06: chỉ cần chạy thêm **07_so_do_cho_ngoi.sql** (chạy lúc nào cũng được, không ảnh hưởng điểm danh đang diễn ra), rồi triển khai bản web mới.
 - Đơn vị đã chạy 01–05: chỉ cần chạy thêm **06_ma_qr_dong.sql**, rồi **triển khai bản web mới ngay** (bản web cũ không điểm danh được với máy chủ đã chạy 06 và ngược lại — không làm việc này trong lúc đang họp).
 - Đơn vị mới chạy 01–04: chạy thêm 05 rồi 06. Các phiên điểm danh cũ được giữ nguyên, tự xếp vào mục "Đã kết thúc".
@@ -27,7 +29,7 @@ Vào dự án Supabase của đơn vị → **SQL Editor** → dán và chạy *
 
 Phần mềm đã cài sẵn địa chỉ dự án Supabase của đơn vị (`DEFAULT_SUPABASE_URL` trong `App.tsx`), nên mọi máy tự kết nối, không phải nhập tay. Nếu đổi sang dự án khác: sửa 2 dòng `DEFAULT_SUPABASE_URL`, `DEFAULT_SUPABASE_KEY` rồi deploy lại.
 
-Kiểm tra: ở **màn hình đăng nhập**, bấm nút góc trên bên phải (**Đã kết nối**) → **Kiểm tra cơ sở dữ liệu** → phải báo "đầy đủ bảng và hàm nghiệp vụ (01–07)".
+Kiểm tra: ở **màn hình đăng nhập**, bấm nút góc trên bên phải (**Đã kết nối**) → **Kiểm tra cơ sở dữ liệu** → phải báo "đầy đủ bảng và hàm nghiệp vụ (01–08)".
 
 ## 2. Dịch vụ gửi email (bắt buộc nếu dùng đăng ký tài khoản / quên mật khẩu)
 
@@ -208,11 +210,108 @@ Phần mềm tự ghép theo **tổ + tên**. Ô trùng tên hoặc không tìm 
 - **Kết quả hội nghị** tách riêng mục **Nghi vấn** để chỉ huy xem xét.
 - Người trong thành phần chưa có ghế trên sơ đồ vẫn điểm danh bình thường, hiện ở danh sách "Chưa có chỗ".
 
+## 8f. Học tập & Thi
+
+Mục **Học tập & Thi** trên menu (điện thoại: nút **Thêm**). Có 3 thẻ:
+
+- **Học tập**: khoá học được giao, học bài, câu hỏi ôn cuối bài.
+- **Thi**: kỳ thi của tôi.
+- **Ngân hàng câu hỏi**: chỉ người có quyền thấy.
+
+Người soạn bài, ra đề và làm giám thị là Trưởng/Phó Trưởng CAP, Quản trị viên, hoặc cán bộ được cấp quyền **Học tập & Thi** (Quản lý cán bộ → sửa cán bộ → Phân quyền).
+
+Chức năng này chỉ chạy khi đã kết nối Supabase, vì đáp án, chấm điểm, đồng hồ và chống gian lận đều nằm trên máy chủ.
+
+**1. Ngân hàng câu hỏi**
+
+- Bấm **Tải mẫu Excel**, điền mỗi dòng 1 câu: Chủ đề, Mức độ, Câu hỏi, Đáp án A–D (có thể thêm cột E, F), Đáp án đúng (chữ A/B/C/D), Giải thích, Nguồn.
+- Bấm **Nhập từ Excel**. Phần mềm báo số câu hợp lệ và các dòng lỗi (thiếu đáp án đúng, đáp án đúng không khớp…) trước khi nhập.
+- Câu trùng nội dung với câu đã có sẽ được cập nhật, không bị nhân đôi.
+- Sửa hoặc thêm từng câu ngay trong app; xuất lại Excel khi cần.
+- **Lưu ý khi viết Giải thích:** viết nội dung, **không ghi "đáp án B"**, vì thứ tự đáp án được đảo khác nhau cho mỗi người.
+- Đáp án chỉ người có quyền xem được. Cán bộ không đọc được bảng câu hỏi, kể cả khi dùng công cụ lập trình.
+
+**2. Khoá học, bài học**
+
+- Bấm **Tạo khoá học**, đặt tên, hạn hoàn thành và người được giao (mặc định toàn đơn vị).
+- Bấm **Thêm bài**. Mỗi bài có thể gồm:
+  - **Văn bản**: dán vào. Quy ước định dạng: `#` tiêu đề, `-` gạch đầu dòng, `**in đậm**`; dòng bắt đầu bằng `Ghi nhớ:` hiện thành khung vàng.
+  - **PDF**: dán link hoặc tải lên.
+  - **Video**:
+    - **YouTube**: đặt chế độ *Không công khai*, rồi dán link.
+    - **Tải tệp lên kho của app**: dùng cho nội dung nội bộ. Tối đa 200 MB, nên nén 720p.
+    - **Google Drive**: dán link. Riêng Drive thì phần mềm không đo được % đã xem.
+- Đặt **thời gian học tối thiểu**. Thời gian chỉ tính khi bài đang mở và có thao tác (cuộn, chạm, xem video); để máy treo không tính. Máy chủ chỉ cộng tối đa đúng số giây thực đã trôi qua.
+- Chọn **câu hỏi ôn** từ ngân hàng, đặt số câu mỗi lượt và số câu cần đúng. Trả lời xong từng câu là thấy ngay đúng/sai và giải thích. Đạt mới tính là xong bài. Chưa đạt thì làm lại, mỗi lần câu hỏi được đổi khác.
+- Bài có video YouTube hoặc tệp tải lên phải xem ≥ 90% video. Không tua qua được đoạn chưa xem.
+- **Học theo thứ tự**: xong bài trước mới mở bài sau.
+- Soạn xong bấm **Giao cho cán bộ**. Trước đó khoá học ở bản nháp, người soạn có thể **Học thử**.
+- **Theo dõi**:
+  - Xem số người đã xong, đang học dở, chưa bắt đầu; tiến độ từng tổ; bảng từng cán bộ × từng bài.
+  - **Xuất Excel**.
+  - **Nhắc người chưa học**: gửi thông báo vào app cho những người chưa học xong.
+
+**Kho tệp video/PDF:** file 08 tự tạo kho `hoc-tap` trên Supabase Storage.
+
+- Tải lên phải có "vé" do máy chủ cấp cho người soạn bài (30 phút), nên người ngoài không tải tệp vào kho được.
+- Ai có đường link tệp thì xem được tệp đó. Nội dung mật **không** đưa lên app.
+- Gói miễn phí Supabase có 1 GB lưu trữ và khoảng 5 GB lượt tải mỗi tháng (1 video 10 phút 720p ≈ 40 MB × số người xem). Video dài, nhiều người xem nên dùng YouTube không công khai.
+
+**3. Kỳ thi**
+
+- Thẻ **Thi** → **Tạo kỳ thi**. Chọn hình thức:
+  - **Thi tập trung**: tại hội trường. Thí sinh phải **quét mã QR phòng thi** (đổi 3 giây/lần, cùng cơ chế điểm danh) mới vào được bài.
+  - **Thi tại nhà**: làm trong khung giờ đặt trước (từ – đến), không cần quét mã.
+- Đặt số câu mỗi đề, thời gian, điểm đạt, chủ đề rút câu. Phần mềm báo ngân hàng có bao nhiêu câu phù hợp.
+- **Điều kiện dự thi** (tuỳ chọn): phải học xong một khoá học.
+- **Chống gian lận** (bật/tắt từng mục):
+  - **Mỗi người một đề**: rút câu ngẫu nhiên, đảo thứ tự câu và đáp án.
+  - **Rời màn hình tối đa N lần** rồi tự nộp. Tính khi chuyển ứng dụng, tắt màn hình, mở tab khác. Mỗi lần rời, thí sinh nhận cảnh báo và giám thị thấy ngay. Thoát ra rồi vào lại cũng tính 1 lần.
+  - **Một bài thi chỉ trên một máy**: đăng nhập máy khác giữa chừng thì bài bị khoá, chờ giám thị. Máy cũ cũng bị khoá theo.
+  - **Chữ chìm họ tên** phủ đề, chặn sao chép, chặn chuột phải: ảnh chụp đề lộ ngay người gửi.
+  - **Hiện điểm ngay khi nộp**, **Cho xem lại đáp án khi công bố**.
+- Đồng hồ tính theo giờ máy chủ; hết giờ bài tự nộp. Mất mạng vẫn làm tiếp, câu trả lời tự gửi khi có mạng lại.
+
+**4. Màn hình giám thị** (nút **Giám thị** ở kỳ thi)
+
+- **Mở thi**, rồi bấm **Mã QR phòng thi** để chiếu lên màn hình (thi tập trung).
+- Bảng thí sinh cập nhật tức thời: tiến độ, số lần rời màn hình, thiết bị, trạng thái (đang làm, đã nộp, chưa vào, bị khoá, mất kết nối). Người có cảnh báo xếp lên đầu.
+- **Nhật ký bất thường**: rời màn hình, đổi máy, dùng chung thiết bị, tự nộp…
+- Xử lý từng người (nút ⋮):
+  - **Mở khoá**: người đó quét lại mã phòng thi để làm tiếp, giữ nguyên bài đã làm.
+  - **Cộng 5 phút**.
+  - **Thu bài**.
+  - **Huỷ bài (vi phạm)**.
+  - **Cho thi lại từ đầu**.
+- **+5 phút** cho tất cả. **Thu bài tất cả**: kết thúc kỳ thi, chấm các bài đang làm.
+
+**5. Kết quả & phân tích** (nút **Kết quả**)
+
+- Xem số người dự thi, điểm trung bình, tỉ lệ đạt, phân bố điểm.
+- **Câu sai nhiều nhất**: dùng để giao bài học ôn lại.
+- **Xếp hạng** toàn đơn vị hoặc theo tổ, kèm danh sách người không dự thi.
+- **Nghi vấn cần hội đồng xem xét**. Phần mềm chỉ nêu dấu hiệu, kết luận do hội đồng:
+  - nộp quá nhanh mà điểm cao;
+  - nhiều câu sai giống hệt nhau giữa 2 người;
+  - rời màn hình;
+  - đổi máy giữa chừng;
+  - 2 tài khoản dùng chung 1 thiết bị.
+
+  Từ danh sách này có thể **Huỷ kết quả** hoặc **Cho thi lại**.
+- **Xuất Excel**: gồm 3 trang tính Kết quả, Câu sai nhiều, Nghi vấn.
+- **Công bố kết quả**: cán bộ xem được điểm và (nếu cho phép) từng câu đúng/sai kèm giải thích.
+
+**Giới hạn cần biết:** phần mềm web không chặn được người khác nhắc bài bên cạnh hay điện thoại thứ hai để tra cứu.
+
+- Với thi tập trung, giám thị tại phòng thi vẫn là chính; nên kết hợp sơ đồ chỗ ngồi để biết ai ngồi đâu.
+- Với thi tại nhà, nên đặt thời gian vừa đủ (khoảng 40–60 giây/câu) và rút ngẫu nhiên từ ngân hàng đủ lớn (gấp 3–5 lần số câu mỗi đề).
+
 ## 9. Danh sách kiểm tra trước khi đưa vào sử dụng
 
-- [ ] Chạy đủ 6 file SQL theo thứ tự trên dự án Supabase của đơn vị (đã chạy 01–05 thì chạy thêm 06), triển khai bản web mới ngay sau đó.
+- [ ] Chạy đủ 8 file SQL theo thứ tự trên dự án Supabase của đơn vị (đã chạy 01–05 thì chạy thêm 06), triển khai bản web mới ngay sau đó.
 - [ ] Đăng nhập `admin` → **đổi mật khẩu ngay** (mật khẩu mặc định 123123 ai cũng biết).
-- [ ] Màn hình đăng nhập → nút **Đã kết nối** → Kiểm tra cơ sở dữ liệu → báo đầy đủ 01–07.
+- [ ] Màn hình đăng nhập → nút **Đã kết nối** → Kiểm tra cơ sở dữ liệu → báo đầy đủ 01–08.
+- [ ] Học tập & Thi: nhập thử ngân hàng câu hỏi từ mẫu Excel; tạo 1 kỳ thi thử với 2–3 người trước khi thi thật.
 - [ ] Kiểm tra danh sách cán bộ, **điền email** cho từng người (cần cho quên mật khẩu).
 - [ ] Cấp quyền "Quản lý điểm danh" cho cán bộ trực tiếp tổ chức hội nghị (nếu không phải Trưởng/Phó).
 - [ ] Triển khai `Mailer.gs`, khai báo `mailer_url`, `mailer_key` (nếu dùng đăng ký/quên mật khẩu).

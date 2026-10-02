@@ -50,7 +50,8 @@ export enum UserPermission {
   MANAGE_TASKS = 'MANAGE_TASKS', // Quản lý toàn bộ nhiệm vụ
   VIEW_ALL_TASKS = 'VIEW_ALL_TASKS', // Xem toàn bộ nhiệm vụ
   MANAGE_PROPOSALS = 'MANAGE_PROPOSALS', // Quản lý đề xuất
-  MANAGE_MAP_DUTY = 'MANAGE_MAP_DUTY' // Quản lý sơ đồ bảo vệ
+  MANAGE_MAP_DUTY = 'MANAGE_MAP_DUTY', // Quản lý sơ đồ bảo vệ
+  MANAGE_LEARNING = 'MANAGE_LEARNING' // Soạn bài, ngân hàng câu hỏi, tổ chức thi
 }
 
 export interface User {
@@ -280,4 +281,117 @@ export interface DutyInfo {
   imageHeight?: number;
   createdAt?: number;
   updatedAt?: number;
+}
+// ===================== HỌC TẬP & THI =====================
+export interface QuizQuestion {
+  id: string;
+  stt?: number | null;
+  topic?: string | null;
+  level?: string | null;
+  text: string;
+  options: string[];
+  correct: number;           // 0 = A
+  explanation?: string | null;
+  source?: string | null;
+  active?: boolean;
+  createdAt?: number;
+}
+
+export interface LearnCourse {
+  id: string;
+  title: string;
+  description?: string | null;
+  deadline?: number | null;
+  assigneeIds: string[];     // [] = toàn đơn vị
+  status: 'DRAFT' | 'PUBLISHED';
+  sequential: boolean;
+  createdAt?: number;
+  updatedAt?: number;
+}
+
+export type VideoKind = 'YOUTUBE' | 'FILE' | 'DRIVE';
+
+export interface LearnLesson {
+  id: string;
+  courseId: string;
+  chapter?: string | null;
+  ord: number;
+  title: string;
+  body?: string | null;
+  videoUrl?: string | null;
+  videoKind?: VideoKind | null;
+  pdfUrl?: string | null;
+  minSeconds: number;
+  questionIds: string[];
+  quizCount: number;
+  quizPass: number;
+}
+
+export interface LearnProgress {
+  id: string;
+  lessonId: string;
+  courseId: string;
+  userId: string;
+  seconds: number;
+  videoPct: number;
+  quizBest: number;
+  quizTries: number;
+  completed: boolean;
+  completedAt?: number | null;
+  updatedAt?: number;
+}
+
+export interface ExamSettings {
+  shuffle?: boolean;     // đảo câu & đáp án
+  oneDevice?: boolean;   // một bài một máy
+  watermark?: boolean;   // chữ chìm họ tên
+  showScore?: boolean;   // hiện điểm ngay khi nộp
+  showReview?: boolean;  // cho xem lại đáp án khi công bố
+}
+
+export interface Exam {
+  id: string;
+  title: string;
+  mode: 'HALL' | 'HOME';
+  location?: string | null;
+  startAt?: number | null;
+  endAt?: number | null;
+  durationMin: number;
+  questionCount: number;
+  topics: string[];
+  questionIds: string[];
+  passScore: number;
+  maxLeave: number;
+  requireCourseId?: string | null;
+  assigneeIds: string[];
+  seatLayoutId?: string | null;
+  settings: ExamSettings;
+  status: 'DRAFT' | 'OPEN' | 'CLOSED';
+  published: boolean;
+  openedAt?: number | null;
+  closedAt?: number | null;
+  createdAt?: number;
+}
+
+export interface ExamEvent { id: string; examId: string; userId?: string | null; kind: string; detail?: string | null; at: number; }
+
+export type AttemptStatus = 'IN_PROGRESS' | 'LOCKED' | 'SUBMITTED' | 'AUTO_SUBMITTED' | 'VOID';
+
+export interface ExamPaperQuestion { id: string; text: string; options: { i: number; t: string }[]; }
+
+export interface MonitorRow {
+  userId: string; status: AttemptStatus; answered: number; total: number;
+  startedAt?: number; deadline?: number; submittedAt?: number | null; submitReason?: string | null;
+  leaveCount: number; leaveMs: number; deviceLabel?: string | null; deviceChanges: number;
+  lockReason?: string | null; lastSeenAt?: number | null; score?: number | null; correct?: number | null;
+}
+
+export interface ResultRow extends MonitorRow {
+  answers: Record<string, number>; keys: Record<string, number>; deviceId?: string | null;
+}
+
+export interface MyAttempt {
+  examId: string; status: AttemptStatus; answered: number; total: number;
+  startedAt?: number; deadline?: number; submittedAt?: number | null; leaveCount: number;
+  score?: number | null; correct?: number | null;
 }
