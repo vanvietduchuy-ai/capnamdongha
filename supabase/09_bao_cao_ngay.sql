@@ -7,14 +7,14 @@
 --  KỲ BÁO CÁO "ngày D": từ <giờ chốt> ngày D-1 đến <giờ chốt> ngày D (mặc định 07:30, giờ Việt Nam).
 --             Hạn nộp = giờ chốt ngày D. Nộp sau hạn → ghi "Nộp muộn".
 --  NGƯỜI BÁO: KHÔNG phân công cố định. Dùng chung 1 link / 1 mã QR cho cả đơn vị.
---             Cán bộ đăng nhập, TỰ CHỌN vai trò (Tổ An ninh, Tổ CSKV, Tổ CSTT, Tổ PCTP,
---             Trực ban hình sự, Trực ban đơn vị) rồi báo cáo — vì người trực ban, người
+--             Cán bộ đăng nhập, chọn TỔ CỦA MÌNH hoặc Trực ban hình sự / Trực ban đơn vị
+--             rồi báo cáo — vì người trực ban, người
 --             báo cáo của các tổ thay đổi hằng ngày.
 --             Phải đăng nhập — máy chủ ghi đúng tên người báo, không báo hộ được.
 --  TRÁCH NHIỆM: mỗi lần nộp là một phiên bản, KHÔNG sửa/xoá được bản đã nộp.
 --             Sửa = nộp bản mới; sau hạn nộp phải ghi lý do đính chính. Lưu đủ lịch sử.
 --  BẢO MẬT:   Mọi bảng của báo cáo ngày KHÔNG đọc/ghi trực tiếp được; chỉ qua hàm có kiểm tra quyền.
---             Không nhập họ tên, số định danh của đối tượng/bị hại.
+--             Không nhập số định danh (CCCD), số điện thoại; thông tin đối tượng chỉ ghi họ tên, năm sinh, nơi ở.
 -- =====================================================================
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
@@ -68,6 +68,8 @@ ALTER TABLE daily_incidents ADD COLUMN IF NOT EXISTS handling    text;     -- t�
 ALTER TABLE daily_incidents ADD COLUMN IF NOT EXISTS "handlingNote" text;  -- kết quả xử lý, đơn vị thụ lý, kiến nghị
 ALTER TABLE daily_incidents ADD COLUMN IF NOT EXISTS "dupOf"     text;     -- key vụ việc gốc (người báo tự chọn)
 ALTER TABLE daily_incidents ADD COLUMN IF NOT EXISTS flash       boolean DEFAULT false; -- đã báo cáo nhanh trước
+ALTER TABLE daily_incidents ADD COLUMN IF NOT EXISTS kind        text;     -- loại: Hình sự | Hành chính
+ALTER TABLE daily_incidents ADD COLUMN IF NOT EXISTS "suspectInfo" text;   -- thông tin đối tượng (họ tên, năm sinh, nơi ở)
 CREATE INDEX IF NOT EXISTS idx_daily_incidents_report ON daily_incidents ("reportId");
 CREATE INDEX IF NOT EXISTS idx_daily_incidents_day ON daily_incidents (day);
 
@@ -159,12 +161,14 @@ LANGUAGE sql STABLE AS $$
 $$;
 
 -- Vai trò khi báo cáo: mọi cán bộ đã duyệt (trừ tài khoản quản trị kỹ thuật) tự chọn đầu mối để báo.
---   LEADER = Tổ trưởng/Tổ phó của tổ đó; DUTY = cán bộ tự chọn vai trò (trực ban, cán bộ của tổ…); NULL = không được báo
+--   Cán bộ chỉ báo cáo cho TỔ CỦA MÌNH, hoặc Trực ban hình sự / Trực ban đơn vị (ai cũng chọn được).
+--   LEADER = Tổ trưởng/Tổ phó của tổ đó; DUTY = cán bộ của tổ / người trực ban; NULL = không được báo
 CREATE OR REPLACE FUNCTION daily_role(u users, p_day date, p_unit text) RETURNS text
 LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public AS $$
 BEGIN
   IF u.id IS NULL OR u.role = 'ADMIN' OR NOT coalesce(u."isApproved", true) THEN RETURN NULL; END IF;
   IF NOT (p_unit = ANY (daily_units())) THEN RETURN NULL; END IF;
+  IF daily_unit_dept(p_unit) IS NOT NULL AND coalesce(u.department, '') <> daily_unit_dept(p_unit) THEN RETURN NULL; END IF;
   IF daily_is_leader(u, p_unit) THEN RETURN 'LEADER'; END IF;
   RETURN 'DUTY';
 END;
@@ -200,7 +204,9 @@ BEGIN
   IF coalesce(i->>'cases', '1') !~ '^\d{1,4}$' OR (i->>'cases')::int < 1 THEN RETURN 'số vụ việc phải từ 1 trở lên'; END IF;
   IF coalesce(i->>'suspects', '0') !~ '^\d{1,4}$' THEN RETURN 'số đối tượng không hợp lệ'; END IF;
   IF coalesce(i->>'victims', '0') !~ '^\d{1,4}$' THEN RETURN 'số bị hại/thương vong không hợp lệ'; END IF;
-  all_text := concat_ws(' ', i->>'summary', i->>'location', i->>'damage', i->>'handlingNote', i->>'occurredAt');
+  IF coalesce(i->>'kind', '') NOT IN ('', 'Hình sự', 'Hành chính') THEN RETURN 'loại vụ việc không hợp lệ'; END IF;
+  IF length(coalesce(i->>'suspectInfo', '')) > 2000 THEN RETURN 'thông tin đối tượng quá dài'; END IF;
+  all_text := concat_ws(' ', i->>'summary', i->>'location', i->>'damage', i->>'handlingNote', i->>'occurredAt', i->>'suspectInfo');
   -- Chặn số định danh / số điện thoại (dãy 9–12 chữ số bắt đầu bằng 0; số tiền không bị chặn)
   IF all_text ~ '(^|\D)0\d{8,11}(\D|$)' THEN RETURN 'có dãy số giống số định danh/điện thoại — không nhập thông tin định danh'; END IF;
   RETURN NULL;
@@ -258,7 +264,7 @@ BEGIN
     END IF;
   END LOOP;
   RETURN jsonb_build_object('ok', true,
-    'v', 3,                         -- phiên bản hàm máy chủ (ứng dụng dùng để phát hiện máy chủ chưa cập nhật)
+    'v', 4,                         -- phiên bản hàm máy chủ (ứng dụng dùng để phát hiện máy chủ chưa cập nhật)
     'currentDay', d,
     'deadline', to_char(daily_deadline_time(), 'HH24:MI'),
     'deadlineAt', (extract(epoch FROM daily_deadline_at(d)) * 1000)::bigint,
@@ -347,9 +353,10 @@ BEGIN
   FOR it IN SELECT * FROM jsonb_array_elements(p_incidents) LOOP
     n := n + 1;
     v_key := coalesce(nullif(it->>'key', ''), new_id('ik'));
-    INSERT INTO daily_incidents (id, "reportId", key, day, unit, ord, field, severity, "occurredAt", location, summary,
+    INSERT INTO daily_incidents (id, "reportId", key, day, unit, ord, kind, "suspectInfo", field, severity, "occurredAt", location, summary,
                                  cases, suspects, victims, damage, handling, "handlingNote", "dupOf", flash)
-    VALUES (new_id('di'), v_id, v_key, p_day, p_unit, n, trim(it->>'field'), nullif(trim(coalesce(it->>'severity', '')), ''),
+    VALUES (new_id('di'), v_id, v_key, p_day, p_unit, n, nullif(trim(coalesce(it->>'kind', '')), ''), nullif(trim(coalesce(it->>'suspectInfo', '')), ''),
+            trim(it->>'field'), nullif(trim(coalesce(it->>'severity', '')), ''),
             nullif(trim(coalesce(it->>'occurredAt', '')), ''), nullif(trim(coalesce(it->>'location', '')), ''), trim(it->>'summary'),
             coalesce(nullif(it->>'cases', '')::int, 1), coalesce(nullif(it->>'suspects', '')::int, 0), coalesce(nullif(it->>'victims', '')::int, 0),
             nullif(trim(coalesce(it->>'damage', '')), ''), nullif(trim(coalesce(it->>'handling', '')), ''),
@@ -357,10 +364,10 @@ BEGIN
             EXISTS (SELECT 1 FROM daily_flash f WHERE f.key = v_key));
   END LOOP;
   -- Báo cáo nhanh của kỳ này chưa có trong danh sách → giữ nguyên, tự gộp vào báo cáo
-  INSERT INTO daily_incidents (id, "reportId", key, day, unit, ord, field, severity, "occurredAt", location, summary,
+  INSERT INTO daily_incidents (id, "reportId", key, day, unit, ord, kind, "suspectInfo", field, severity, "occurredAt", location, summary,
                                cases, suspects, victims, damage, handling, "handlingNote", flash)
   SELECT new_id('di'), v_id, f.key, p_day, p_unit, 1000 + row_number() OVER (ORDER BY f."createdAt"),
-         f.data->>'field', f.data->>'severity', f.data->>'occurredAt', f.data->>'location', f.data->>'summary',
+         nullif(f.data->>'kind', ''), nullif(f.data->>'suspectInfo', ''), f.data->>'field', f.data->>'severity', f.data->>'occurredAt', f.data->>'location', f.data->>'summary',
          coalesce(nullif(f.data->>'cases', '')::int, 1), coalesce(nullif(f.data->>'suspects', '')::int, 0), coalesce(nullif(f.data->>'victims', '')::int, 0),
          f.data->>'damage', f.data->>'handling', f.data->>'handlingNote', true
     FROM daily_flash f
