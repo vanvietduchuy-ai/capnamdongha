@@ -17,6 +17,7 @@ import {
   Plus, CalendarPlus, CalendarClock, Timer, MapPin, Users as UsersIcon, Play, Pencil, Trash2, QrCode, UserPlus, Square,
   FileText, RotateCcw, X, ChevronLeft, ChevronRight, Maximize2, FileDown, Sheet as SheetIcon, CheckCircle2, LayoutGrid, AlertTriangle
 } from 'lucide-react';
+import { backdropClose } from '../lib/backdrop';
 
 interface Props { currentUser: User; }
 
@@ -608,7 +609,7 @@ const Stat: React.FC<{ n: number | string; label: string; cls: string }> = ({ n,
 
 /** Hộp thoại: trượt từ dưới lên trên điện thoại, giữa màn hình trên máy tính */
 const Sheet: React.FC<{ title: string; onClose: () => void; footer?: React.ReactNode; children: React.ReactNode }> = ({ title, onClose, footer, children }) => (
-  <Portal><div className="fixed inset-0 z-[110] bg-stone-900/50 flex items-end md:items-center justify-center md:p-4" onClick={onClose}>
+  <Portal><div className="fixed inset-0 z-[110] bg-stone-900/50 flex items-end md:items-center justify-center md:p-4" {...backdropClose(onClose)}>
     <div className="bg-white w-full md:max-w-lg rounded-t-2xl md:rounded-xl border border-stone-200 shadow-2xl max-h-[92vh] flex flex-col" onClick={e => e.stopPropagation()}>
       <div className="flex items-center justify-between px-4 pt-4 pb-2">
         <h3 className="text-base font-semibold text-stone-900">{title}</h3>

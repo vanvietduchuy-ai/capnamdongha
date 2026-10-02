@@ -10,6 +10,7 @@ import {
   InstallEnv, detectInstallEnv, subscribeInstall, promptInstall, chromeIntentUrl, installPageUrl,
   hintDismissedRecently, dismissHint
 } from '../lib/install';
+import { backdropClose } from '../lib/backdrop';
 
 const APP_TITLE = 'CAP Nam Đông Hà';
 
@@ -199,7 +200,7 @@ export const InstallSheet: React.FC<{ open: boolean; onClose: () => void }> = ({
   if (!open) return null;
   return (
     <Portal>
-      <div className="fixed inset-0 z-[115] bg-stone-900/50 flex items-end md:items-center justify-center md:p-4" onClick={onClose} data-testid="install-sheet">
+      <div className="fixed inset-0 z-[115] bg-stone-900/50 flex items-end md:items-center justify-center md:p-4" {...backdropClose(onClose)} data-testid="install-sheet">
         <div className="bg-white w-full md:max-w-md rounded-t-2xl md:rounded-xl border border-stone-200 shadow-2xl max-h-[92vh] flex flex-col" onClick={e => e.stopPropagation()}>
           <div className="flex items-center gap-3 px-4 pt-4 pb-3">
             <img src={LOGO_URL} alt="" className="w-10 h-10 object-contain" />

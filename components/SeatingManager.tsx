@@ -5,6 +5,7 @@ import { Seat, SeatLayout, User, UserRole } from '../types';
 import { Portal } from './Portal';
 import { SeatMap } from './SeatMap';
 import { autoMatch, candidatesFor, layoutByTeam, readLayoutFile, SeatState, teamOf } from '../lib/seating';
+import { backdropClose } from '../lib/backdrop';
 
 interface Props {
   open: boolean;
@@ -208,7 +209,7 @@ export const SeatingManager: React.FC<Props> = ({ open, users, initialId, onClos
   })();
 
   return (
-    <Portal><div className="fixed inset-0 z-[125] bg-stone-900/50 flex md:items-center md:justify-center md:p-4" onClick={onClose}>
+    <Portal><div className="fixed inset-0 z-[125] bg-stone-900/50 flex md:items-center md:justify-center md:p-4" {...backdropClose(onClose)}>
       <div className="bg-orange-50 w-full md:max-w-2xl h-full md:h-auto md:max-h-[92vh] md:rounded-2xl flex flex-col overflow-hidden" onClick={e => e.stopPropagation()} data-testid="seating-manager">
         <div className="bg-white border-b border-stone-200 h-14 px-2 flex items-center gap-1 shrink-0" style={{ paddingTop: 'env(safe-area-inset-top)', boxSizing: 'content-box' }}>
           {edit ? <button onClick={() => { setEdit(null); setSel(null); }} aria-label="Quay lại" className="p-2 rounded-lg text-stone-600"><ChevronLeft className="w-5 h-5" /></button>
