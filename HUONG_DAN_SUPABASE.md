@@ -6,7 +6,7 @@ Công an phường Nam Đông Hà · Dữ liệu lưu trên **Supabase** (Postgr
 
 ## 1. Cài đặt cơ sở dữ liệu (làm 1 lần, khoảng 5 phút)
 
-Vào dự án Supabase của đơn vị → **SQL Editor** → dán và chạy **đúng thứ tự** 8 file trong thư mục `supabase/`:
+Vào dự án Supabase của đơn vị → **SQL Editor** → dán và chạy **đúng thứ tự** 9 file trong thư mục `supabase/`:
 
 | Thứ tự | File | Nội dung |
 |---|---|---|
@@ -18,8 +18,10 @@ Vào dự án Supabase của đơn vị → **SQL Editor** → dán và chạy *
 | 6 | `06_ma_qr_dong.sql` | Mã QR có chữ ký máy chủ, đổi **3 giây/lần**, máy chủ kiểm tra từng lần quét |
 | 7 | `07_so_do_cho_ngoi.sql` | Sơ đồ chỗ ngồi, **Đối sánh sơ đồ chỗ ngồi**, đánh dấu nghi vấn |
 | 8 | `08_hoc_tap_thi.sql` | **Học tập & Thi**: ngân hàng câu hỏi, khoá học, bài học, kỳ thi chống gian lận, kho tệp `hoc-tap` |
+| 9 | `09_bao_cao_ngay.sql` | **Báo cáo ngày**: phân công, báo cáo tình hình ANTT hằng ngày, báo cáo nhanh, tổng hợp |
 
-- Cả 8 file an toàn khi chạy lại. **Nếu chạy lại, luôn chạy đủ theo thứ tự.** Đặc biệt: đã chạy lại file 04 thì **bắt buộc chạy lại 05 và 06** ngay sau đó (nếu không, mã QR sẽ mất lớp kiểm tra chữ ký).
+- Cả 9 file an toàn khi chạy lại. **Nếu chạy lại, luôn chạy đủ theo thứ tự.** Đặc biệt: đã chạy lại file 04 thì **bắt buộc chạy lại 05 và 06** ngay sau đó (nếu không, mã QR sẽ mất lớp kiểm tra chữ ký).
+- Đơn vị đã chạy 01–08: chỉ cần chạy thêm **09_bao_cao_ngay.sql** (chạy lúc nào cũng được), rồi triển khai bản web mới.
 - Đơn vị đã chạy 01–07: chỉ cần chạy thêm **08_hoc_tap_thi.sql** (chạy lúc nào cũng được), rồi triển khai bản web mới.
 - Đơn vị đã chạy 01–06: chỉ cần chạy thêm **07_so_do_cho_ngoi.sql** (chạy lúc nào cũng được, không ảnh hưởng điểm danh đang diễn ra), rồi triển khai bản web mới.
 - Đơn vị đã chạy 01–05: chỉ cần chạy thêm **06_ma_qr_dong.sql**, rồi **triển khai bản web mới ngay** (bản web cũ không điểm danh được với máy chủ đã chạy 06 và ngược lại — không làm việc này trong lúc đang họp).
@@ -29,7 +31,7 @@ Vào dự án Supabase của đơn vị → **SQL Editor** → dán và chạy *
 
 Phần mềm đã cài sẵn địa chỉ dự án Supabase của đơn vị (`DEFAULT_SUPABASE_URL` trong `App.tsx`), nên mọi máy tự kết nối, không phải nhập tay. Nếu đổi sang dự án khác: sửa 2 dòng `DEFAULT_SUPABASE_URL`, `DEFAULT_SUPABASE_KEY` rồi deploy lại.
 
-Kiểm tra: ở **màn hình đăng nhập**, bấm nút góc trên bên phải (**Đã kết nối**) → **Kiểm tra cơ sở dữ liệu** → phải báo "đầy đủ bảng và hàm nghiệp vụ (01–08)".
+Kiểm tra: ở **màn hình đăng nhập**, bấm nút góc trên bên phải (**Đã kết nối**) → **Kiểm tra cơ sở dữ liệu** → phải báo "đầy đủ bảng và hàm nghiệp vụ (01–09)".
 
 ## 2. Dịch vụ gửi email (bắt buộc nếu dùng đăng ký tài khoản / quên mật khẩu)
 
@@ -306,14 +308,63 @@ Chức năng này chỉ chạy khi đã kết nối Supabase, vì đáp án, ch�
 - Với thi tập trung, giám thị tại phòng thi vẫn là chính; nên kết hợp sơ đồ chỗ ngồi để biết ai ngồi đâu.
 - Với thi tại nhà, nên đặt thời gian vừa đủ (khoảng 40–60 giây/câu) và rút ngẫu nhiên từ ngân hàng đủ lớn (gấp 3–5 lần số câu mỗi đề).
 
+## 8g. Báo cáo ngày
+
+Mục **Báo cáo ngày** trên menu. **6 đầu mối** báo cáo: Tổ An ninh, Tổ CSKV, Tổ CSTT, Tổ PCTP, Trực ban hình sự, Trực ban đơn vị. Tổ Tổng hợp không báo cáo, chỉ theo dõi và tổng hợp.
+
+**Kỳ báo cáo và hạn nộp**
+
+- Kỳ báo cáo "ngày D" tính từ **07 giờ 30 ngày D-1 đến 07 giờ 30 ngày D**. Hạn nộp là 07 giờ 30 ngày D.
+- Nộp sau hạn vẫn được (tối đa 7 ngày) nhưng bị ghi **nộp muộn**.
+- Đổi giờ chốt: Trưởng CAP hoặc Quản trị viên vào thẻ **Phân công** → mục **Giờ chốt**.
+- Nếu Supabase đã bật pg_cron (Integrations → Cron), app **tự nhắc** lúc 07 giờ 00 những người chưa báo. Đổi giờ chốt thì sửa giờ nhắc ở đó. Ngoài ra người theo dõi có thể bấm **Nhắc đầu mối chưa báo** bất cứ lúc nào.
+
+**Phân công** (thẻ **Phân công**)
+
+- **Phân công thường xuyên**: mỗi đầu mối 1 người báo cáo chính và 1 người dự phòng.
+  - Tổ trưởng, Tổ phó phân công cho tổ mình.
+  - Trực ban hình sự, Trực ban đơn vị do người quản lý báo cáo ngày phân công.
+- **Lịch theo ngày**: bấm vào ô để phân công riêng cho ngày đó. Dùng cho trực ban thay đổi theo lịch trực.
+- Tổ trưởng, Tổ phó luôn báo được cho tổ mình. Ngoài những người này và người được phân công, không ai báo được.
+- **Link và mã QR**: mỗi đầu mối có link `/?bao-cao-ngay=CSKV`… và mã QR in được. Link chỉ mở thẳng biểu mẫu; người báo **vẫn phải đăng nhập tài khoản của mình**, nên luôn biết chính xác ai báo.
+
+**Người báo cáo** (thẻ **Báo cáo của tôi**, trang chủ có dòng nhắc khi chưa nộp)
+
+1. Chọn **Bình thường** hoặc **Có vụ việc**.
+2. Có vụ việc thì nhập từng vụ:
+   - lĩnh vực (danh mục cố định), mức độ, thời gian, địa điểm, nội dung;
+   - số vụ, số đối tượng, bị hại;
+   - thiệt hại, tình trạng và kết quả xử lý.
+3. Nếu vụ việc đã được đầu mối khác báo (VD: trực ban đã tiếp nhận tin báo), chọn **Trùng với vụ việc đầu mối khác** để không bị cộng 2 lần.
+4. Đánh dấu ô **xác nhận chịu trách nhiệm trước Ban Chỉ huy**, rồi bấm **Nộp báo cáo**.
+
+- Mỗi lần nộp là 1 phiên bản. Bản đã nộp **không sửa, không xoá được**. Muốn bổ sung thì nộp bản đính chính; sau hạn nộp phải ghi lý do. Toàn bộ lịch sử được lưu.
+- **Báo cáo nhanh**: dùng khi có vụ việc nghiêm trọng. Chỉ huy và Tổ Tổng hợp nhận thông báo ngay; vụ việc tự đưa vào báo cáo ngày. Đã có báo cáo nhanh thì không báo "Bình thường" được.
+- **Không nhập họ tên, số CCCD, số điện thoại** của đối tượng, bị hại. Máy chủ từ chối dãy số giống số định danh, số điện thoại.
+
+**Theo dõi, tổng hợp** (Trưởng/Phó Trưởng CAP, Tổ trưởng/Tổ phó Tổ Tổng hợp, Quản trị viên, hoặc cán bộ được cấp quyền **Quản lý Báo cáo ngày**; Tổ trưởng các tổ chỉ xem tổ mình)
+
+- Thẻ **Theo dõi**:
+  - 6 ô xanh/cam/đỏ theo trạng thái báo cáo, số vụ việc, số đối tượng, nộp muộn, báo cáo nhanh;
+  - lịch sử phiên bản của từng đầu mối;
+  - **gộp vụ trùng** (Tổ Tổng hợp quyết định, ghi đè lựa chọn của người báo);
+  - **Xuất Word báo cáo ngày** theo thể thức NĐ30, ký hiệu `/BC-CAP-TH`, đánh số trang từ trang 2, số liệu in đậm.
+- Thẻ **Tổng hợp**:
+  - tuần, tháng, quý, năm hoặc tự chọn;
+  - bảng chấp hành chế độ báo cáo (không báo, nộp muộn) và bảng vụ việc theo lĩnh vực × đầu mối;
+  - **Xuất Word tổng hợp** và **Xuất Excel** (3 trang tính).
+
+**Bảo mật**: mọi bảng của báo cáo ngày **không đọc, không ghi trực tiếp được**, kể cả khi có khoá công khai. Chỉ đọc, ghi qua hàm máy chủ có kiểm tra quyền.
+
 ## 9. Danh sách kiểm tra trước khi đưa vào sử dụng
 
-- [ ] Chạy đủ 8 file SQL theo thứ tự trên dự án Supabase của đơn vị (đã chạy 01–05 thì chạy thêm 06), triển khai bản web mới ngay sau đó.
+- [ ] Chạy đủ 9 file SQL theo thứ tự trên dự án Supabase của đơn vị (đã chạy 01–05 thì chạy thêm 06), triển khai bản web mới ngay sau đó.
 - [ ] Đăng nhập `admin` → **đổi mật khẩu ngay** (mật khẩu mặc định 123123 ai cũng biết).
-- [ ] Màn hình đăng nhập → nút **Đã kết nối** → Kiểm tra cơ sở dữ liệu → báo đầy đủ 01–08.
+- [ ] Màn hình đăng nhập → nút **Đã kết nối** → Kiểm tra cơ sở dữ liệu → báo đầy đủ 01–09.
 - [ ] Học tập & Thi: nhập thử ngân hàng câu hỏi từ mẫu Excel; tạo 1 kỳ thi thử với 2–3 người trước khi thi thật.
 - [ ] Kiểm tra danh sách cán bộ, **điền email** cho từng người (cần cho quên mật khẩu).
 - [ ] Cấp quyền "Quản lý điểm danh" cho cán bộ trực tiếp tổ chức hội nghị (nếu không phải Trưởng/Phó).
+- [ ] Báo cáo ngày: phân công người báo cáo cho 6 đầu mối (thẻ Phân công), in mã QR, chạy thử 1–2 tuần song song cách báo cáo cũ.
 - [ ] Triển khai `Mailer.gs`, khai báo `mailer_url`, `mailer_key` (nếu dùng đăng ký/quên mật khẩu).
 - [ ] Chạy thử: tạo hội nghị, chọn 3–4 người, Bắt đầu, cho 1 khách mời quét mã, Kết thúc; xuất Word + Excel.
 - [ ] Thử trên cả Android và iPhone: quét mã, camera được cấp quyền, phần mềm chạy trên HTTPS (link Vercel).

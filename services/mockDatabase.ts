@@ -309,7 +309,11 @@ export const MockDB = {
      if (learn.error || exam.error) {
        return { ok: false, message: 'Chưa cài Học tập & Thi. Hãy chạy file supabase/08_hoc_tap_thi.sql.' };
      }
-     return { ok: true, message: 'Cơ sở dữ liệu đã đầy đủ bảng và hàm nghiệp vụ (01–08).' };
+     const daily = await client.rpc('app_daily_me', { p_token: 'kiem-tra-cai-dat-000000000000' });
+     if (daily.error) {
+       return { ok: false, message: 'Chưa cài Báo cáo ngày. Hãy chạy file supabase/09_bao_cao_ngay.sql.' };
+     }
+     return { ok: true, message: 'Cơ sở dữ liệu đã đầy đủ bảng và hàm nghiệp vụ (01–09).' };
   },
 
   subscribe: (callback: (table?: string) => void) => {

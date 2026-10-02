@@ -51,7 +51,8 @@ export enum UserPermission {
   VIEW_ALL_TASKS = 'VIEW_ALL_TASKS', // Xem toàn bộ nhiệm vụ
   MANAGE_PROPOSALS = 'MANAGE_PROPOSALS', // Quản lý đề xuất
   MANAGE_MAP_DUTY = 'MANAGE_MAP_DUTY', // Quản lý sơ đồ bảo vệ
-  MANAGE_LEARNING = 'MANAGE_LEARNING' // Soạn bài, ngân hàng câu hỏi, tổ chức thi
+  MANAGE_LEARNING = 'MANAGE_LEARNING', // Soạn bài, ngân hàng câu hỏi, tổ chức thi
+  MANAGE_DAILY_REPORT = 'MANAGE_DAILY_REPORT' // Theo dõi, tổng hợp, phân công báo cáo ngày
 }
 
 export interface User {
@@ -394,4 +395,92 @@ export interface MyAttempt {
   examId: string; status: AttemptStatus; answered: number; total: number;
   startedAt?: number; deadline?: number; submittedAt?: number | null; leaveCount: number;
   score?: number | null; correct?: number | null;
+}
+
+// ===================== BÁO CÁO NGÀY =====================
+export type DailyUnit = 'AN_NINH' | 'CSKV' | 'CSTT' | 'PCTP' | 'TBHS' | 'TBDV';
+export type DailyStatus = 'NORMAL' | 'INCIDENT';
+export type DailyRole = 'MAIN' | 'BACKUP' | 'LEADER';
+
+export interface DailyIncident {
+  id?: string;
+  key: string;               // giữ nguyên qua các phiên bản (để gộp trùng)
+  day?: string;
+  unit?: DailyUnit;
+  field: string;             // lĩnh vực
+  severity?: string | null;
+  occurredAt?: string | null;
+  location?: string | null;
+  summary: string;
+  cases: number;             // số vụ việc
+  suspects: number;          // số đối tượng
+  victims: number;           // số bị hại / thương vong
+  damage?: string | null;
+  handling?: string | null;
+  handlingNote?: string | null;
+  dupOf?: string | null;     // key vụ việc gốc (người báo tự chọn)
+  flash?: boolean;           // đã báo cáo nhanh trước đó
+}
+
+export interface DailyReport {
+  id: string;
+  day: string;               // YYYY-MM-DD
+  unit: DailyUnit;
+  version: number;
+  active: boolean;
+  status: DailyStatus;
+  note?: string | null;
+  reporterId: string;
+  reporterName: string;
+  reporterRole: DailyRole;
+  submittedAt: number;
+  late: boolean;
+  reason?: string | null;
+  deadlineAt: number;
+  incidents: DailyIncident[];
+}
+
+export interface DailyFlash {
+  id: string;
+  key: string;
+  day: string;
+  unit: DailyUnit;
+  data: DailyIncident;
+  reporterId: string;
+  reporterName: string;
+  createdAt: number;
+}
+
+export interface DailyUnitInfo {
+  unit: DailyUnit;
+  unitName: string;
+  mainId?: string | null;
+  mainName?: string | null;
+  backupId?: string | null;
+  backupName?: string | null;
+  report: DailyReport | null;
+  versions: number;
+  flash: DailyFlash[];
+}
+
+export interface DailyMine {
+  unit: DailyUnit;
+  unitName: string;
+  day: string;
+  role: DailyRole;
+  reported: boolean;
+  overdue?: boolean;
+  status?: DailyStatus | null;
+  reporterName?: string | null;
+  submittedAt?: number | null;
+}
+
+export interface DailyOtherIncident {
+  key: string; unit: DailyUnit; unitName: string; field: string;
+  location?: string | null; occurredAt?: string | null; summary: string; flash?: boolean;
+}
+
+export interface DailyAssignItem {
+  id: string; unit: DailyUnit; day: string | null; userId: string | null; backupId: string | null;
+  updatedBy?: string; updatedAt?: number;
 }
