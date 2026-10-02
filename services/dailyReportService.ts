@@ -39,6 +39,7 @@ export const FIELDS = [
   'Tin báo, tố giác tội phạm',
   'Khác'
 ];
+export const KINDS = ['Hình sự', 'Hành chính'];
 export const SEVERITIES = ['Ít nghiêm trọng', 'Nghiêm trọng', 'Rất nghiêm trọng', 'Đặc biệt nghiêm trọng'];
 export const HANDLINGS = ['Đang xác minh, giải quyết', 'Đã giải quyết xong', 'Đã chuyển cơ quan có thẩm quyền', 'Đã báo cáo cấp trên', 'Khác'];
 export const ROLE_TEXT: Record<string, string> = { LEADER: 'Lãnh đạo tổ', DUTY: 'Cán bộ báo cáo', MAIN: 'Người báo cáo chính', BACKUP: 'Người dự phòng' };
@@ -51,7 +52,7 @@ export const looksLikeId = (s?: string | null) => !!s && /(^|\D)0\d{8,11}(\D|$)/
 
 export const newKey = () => 'ik_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
 export const blankIncident = (): DailyIncident => ({
-  key: newKey(), field: '', severity: '', occurredAt: '', location: '', summary: '',
+  key: newKey(), kind: '', field: '', suspectInfo: '', severity: '', occurredAt: '', location: '', summary: '',
   cases: 1, suspects: 0, victims: 0, damage: '', handling: '', handlingNote: '', dupOf: null
 });
 
@@ -164,7 +165,7 @@ export const Daily = {
 };
 
 const cleanIncident = (i: DailyIncident) => ({
-  key: i.key, field: i.field, severity: i.severity || '', occurredAt: (i.occurredAt || '').trim(), location: (i.location || '').trim(),
+  key: i.key, kind: i.kind || '', suspectInfo: (i.suspectInfo || '').trim(), field: i.field, severity: i.severity || '', occurredAt: (i.occurredAt || '').trim(), location: (i.location || '').trim(),
   summary: (i.summary || '').trim(), cases: Math.max(1, Number(i.cases) || 1), suspects: Math.max(0, Number(i.suspects) || 0),
   victims: Math.max(0, Number(i.victims) || 0), damage: (i.damage || '').trim(), handling: i.handling || '',
   handlingNote: (i.handlingNote || '').trim(), dupOf: i.dupOf || ''
@@ -172,12 +173,72 @@ const cleanIncident = (i: DailyIncident) => ({
 
 /** Kiểm tra trên máy trước khi gửi (máy chủ kiểm tra lại) */
 export const incidentError = (i: DailyIncident): string | null => {
+  if (!i.kind) return 'Chưa chọn loại (hình sự / hành chính).';
   if (!i.field) return 'Chưa chọn lĩnh vực.';
   if ((i.summary || '').trim().length < 5) return 'Chưa nhập nội dung vụ việc.';
   if (!(Number(i.cases) >= 1)) return 'Số vụ việc phải từ 1 trở lên.';
-  if ([i.summary, i.location, i.damage, i.handlingNote, i.occurredAt].some(looksLikeId))
+  if ([i.summary, i.location, i.damage, i.handlingNote, i.occurredAt, i.suspectInfo].some(looksLikeId))
     return 'Có dãy số giống số định danh/điện thoại. Không nhập thông tin định danh.';
   return null;
+};
+
+/* ======================= TỰ ĐỌC NỘI DUNG VỤ VIỆC ======================= */
+/** Bỏ dấu tiếng Việt (để tìm kiếm) */
+export const noAccent = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').toLowerCase();
+
+const NUM_WORD: Record<string, number> = { 'một': 1, 'hai': 2, 'ba': 3, 'bốn': 4, 'năm': 5, 'sáu': 6, 'bảy': 7, 'tám': 8, 'chín': 9, 'mười': 10 };
+const NAME = String.raw`\p{Lu}\p{Ll}*(?:\s+\p{Lu}\p{Ll}*){1,4}`;
+const ADDR_KEY = String.raw`(?:trú|thường trú|tạm trú|HKTT|nơi ở|địa chỉ|ở)`;
+
+export interface ParsedIncident { suspects: number; suspectInfo: string; occurredAt: string; location: string; }
+
+/** Đọc nội dung vụ việc: số đối tượng, họ tên – năm sinh – nơi ở của đối tượng, thời gian, địa điểm (người dùng sửa lại được) */
+export const parseIncidentText = (text: string): ParsedIncident => {
+  const t = (text || '').replace(/\s+/g, ' ').trim();
+  const people = new Map<string, { name: string; year?: string; addr?: string }>();
+  const nextPerson = new RegExp(String.raw`\s+(?:và|cùng|là|đã|có|thì|bị|đang|gây|thực hiện)\s+|,\s*(?=${NAME}\s*[,(]?\s*(?:sinh|SN|sn|NS))`, 'u');
+  const cleanAddr = (a?: string) => (a || '').split(nextPerson)[0].replace(/[\s,;:]+$/, '').trim();
+  // 1) Họ tên + năm sinh (+ nơi ở): "Nguyễn Văn A, sinh năm 1990, trú TDP 3"
+  const reFull = new RegExp(String.raw`(${NAME})\s*[,(–-]?\s*(?:sinh năm|sinh ngày\s*[\d/.-]+|năm sinh|SN|sn|NS|s\.n)\s*:?\s*((?:19|20)\d{2})\)?(?:\s*[,;–-]?\s*${ADDR_KEY}\s*(?:tại)?\s*:?\s*([^;.\n()]+))?`, 'gu');
+  for (const m of t.matchAll(reFull)) {
+    const name = m[1].replace(/^(?:Đối tượng|Anh|Chị|Ông|Bà|Cháu|Em|Tên)\s+/u, '');
+    if (name.split(' ').length < 2) continue;
+    people.set(name, { name, year: m[2], addr: cleanAddr(m[3]) });
+  }
+  // 2) "đối tượng Nguyễn Văn B" (không có năm sinh)
+  const reName = new RegExp(String.raw`(?:đối tượng|ĐT|đối tượng là|gồm)\s*:?\s*(${NAME})`, 'gu');
+  for (const m of t.matchAll(reName)) {
+    const name = m[1];
+    if (name.split(' ').length >= 2 && ![...people.keys()].some(k => k.includes(name) || name.includes(k))) people.set(name, { name });
+  }
+  // 2b) Danh sách sau "gồm": "gồm A, B và C"
+  for (const m of t.matchAll(/gồm\s*:?\s*([^.;\n]+)/gu)) {
+    for (const nm of m[1].matchAll(new RegExp(NAME, 'gu'))) {
+      const name = nm[0];
+      if (/(?:trú|tại|ở|HKTT|xã|phường|huyện|tỉnh|thôn|TDP|quán|đường)\s*:?\s*$/u.test(m[1].slice(0, nm.index))) continue; // là địa danh
+      if (name.split(' ').length >= 2 && ![...people.keys()].some(k => k.includes(name) || name.includes(k))) people.set(name, { name });
+    }
+  }
+  // 3) Số đối tượng ghi bằng số / chữ: "3 đối tượng", "hai đối tượng"
+  let n = 0;
+  const reNum = /(\d{1,3}|một|hai|ba|bốn|năm|sáu|bảy|tám|chín|mười)\s+(?:đối tượng|người|thanh niên|nam thanh niên|đối tượng nam|đối tượng nữ)\b/giu;
+  for (const m of t.matchAll(reNum)) {
+    const v = /\d/.test(m[1]) ? Number(m[1]) : NUM_WORD[m[1].toLowerCase()] || 0;
+    if (v > n && v < 1000) n = v;
+  }
+  const list = [...people.values()];
+  const suspects = Math.max(n, list.length);
+  const suspectInfo = list.map(p => [p.name, p.year ? `SN ${p.year}` : '', p.addr ? `trú ${p.addr}` : ''].filter(Boolean).join(', ')).join('\n');
+  // Thời gian: "21h30 ngày 02/10", "lúc 21 giờ 30 phút ngày 02/10/2026"
+  const tm = t.match(/(\d{1,2}\s*(?:giờ|h(?!\p{L})|g(?!\p{L})|h(?=\d)|g(?=\d))\s*(?:\d{1,2}\s*(?:phút|p(?!\p{L}))?)?)(?:[,\s]*(?:ngày)\s*(\d{1,2}[/.-]\d{1,2}(?:[/.-]\d{2,4})?))?/iu)
+    || t.match(/ngày\s*(\d{1,2}[/.-]\d{1,2}(?:[/.-]\d{2,4})?)/iu);
+  const hm = (x: string) => { const m = x.match(/(\d{1,2})\D+(\d{1,2})?/); return m ? `${m[1]}h${m[2] ? m[2].padStart(2, '0') : ''}` : x.trim(); };
+  const occurredAt = !tm ? '' : /ngày\s*$/i.test(tm[0].slice(0, 5)) || /^ngày/i.test(tm[0]) ? tm[0].replace(/^ngày\s*/i, 'ngày ').trim()
+    : `${hm(tm[1])}${tm[2] ? ` ngày ${tm[2]}` : ''}`;
+  // Địa điểm: "tại TDP 3", "tại quán ..."
+  const lm = t.match(/\btại\s+((?:TDP|tổ dân phố|khu phố|KP|đường|số nhà|số|thôn|kiệt|ngõ|hẻm|quán|nhà|chợ|trường|khu vực|khu|cửa hàng|siêu thị|chung cư|ngã tư|ngã ba)[^,.;\n]{0,60})/iu);
+  const location = lm ? lm[1].trim() : '';
+  return { suspects, suspectInfo, occurredAt, location };
 };
 
 /* ============================ TỔNG HỢP ============================ */
@@ -318,7 +379,7 @@ const buildDocx = async (d: DocInput) => {
 const cap = (t: string) => t.charAt(0).toUpperCase() + t.slice(1);
 const endDot = (t: string) => t.replace(/[\s.;,]+$/, '') + '.';
 const incidentSentence = (i: DailyIncident, idx: number, withUnit = true): Seg[] => {
-  const segs: Seg[] = [`${idx}. `, { b: i.field }];
+  const segs: Seg[] = [`${idx}. `, ...(i.kind ? [`${i.kind} – `] : []), { b: i.field }];
   if (i.severity) segs.push(` (${i.severity})`);
   segs.push(': ');
   const where = [i.occurredAt && `thời gian ${i.occurredAt}`, i.location && `tại ${i.location}`].filter(Boolean).join(', ');
@@ -330,6 +391,7 @@ const incidentSentence = (i: DailyIncident, idx: number, withUnit = true): Seg[]
   if (i.victims) nums.push('; số bị hại, thương vong: ', i.victims);
   nums[0] = cap(String(nums[0]));
   segs.push(...nums, '.');
+  if (i.suspectInfo) segs.push(' Đối tượng: ' + endDot(i.suspectInfo.split('\n').map(x => x.trim()).filter(Boolean).join('; ')));
   if (i.damage) segs.push(' Thiệt hại: ' + endDot(i.damage));
   if (i.handling || i.handlingNote) segs.push(' Kết quả xử lý: ' + endDot([i.handling, i.handlingNote].filter(Boolean).join(' – ')));
   if (withUnit && i.unit) segs.push(` (Nguồn: ${unitName(i.unit)}${i.flash ? ', đã báo cáo nhanh' : ''}.)`);
@@ -444,12 +506,12 @@ export const exportRangeExcel = async (rg: DailyRange, label: string) => {
   const wb = XLSX.utils.book_new();
   const head = [['CÔNG AN PHƯỜNG NAM ĐÔNG HÀ'], [`TỔNG HỢP BÁO CÁO NGÀY ${label.toUpperCase()}`], [`Xuất lúc: ${vnDateTime(Date.now())}`], []];
 
-  const s1: any[][] = [...head, ['STT', 'Ngày', 'Đầu mối', 'Lĩnh vực', 'Mức độ', 'Thời gian', 'Địa điểm', 'Nội dung', 'Số vụ', 'Số đối tượng',
-    'Bị hại/thương vong', 'Thiệt hại', 'Tình trạng xử lý', 'Kết quả xử lý', 'Báo cáo nhanh', 'Trùng với vụ khác']];
-  rg.incidents.forEach((i, k) => s1.push([k + 1, dayText(i.day || ''), unitName(i.unit), i.field, i.severity || '', i.occurredAt || '', i.location || '',
-    i.summary, i.cases, i.suspects, i.victims, i.damage || '', i.handling || '', i.handlingNote || '', i.flash ? 'Có' : '', dupTarget(i, rg.dups) ? 'Trùng (không cộng)' : '']));
+  const s1: any[][] = [...head, ['STT', 'Ngày', 'Đầu mối', 'Loại', 'Lĩnh vực', 'Mức độ', 'Thời gian', 'Địa điểm', 'Nội dung', 'Số vụ', 'Số đối tượng',
+    'Bị hại/thương vong', 'Thông tin đối tượng', 'Thiệt hại', 'Tình trạng xử lý', 'Kết quả xử lý', 'Báo cáo nhanh', 'Trùng với vụ khác']];
+  rg.incidents.forEach((i, k) => s1.push([k + 1, dayText(i.day || ''), unitName(i.unit), i.kind || '', i.field, i.severity || '', i.occurredAt || '', i.location || '',
+    i.summary, i.cases, i.suspects, i.victims, i.suspectInfo || '', i.damage || '', i.handling || '', i.handlingNote || '', i.flash ? 'Có' : '', dupTarget(i, rg.dups) ? 'Trùng (không cộng)' : '']));
   const ws1 = XLSX.utils.aoa_to_sheet(s1);
-  ws1['!cols'] = [5, 11, 16, 26, 16, 14, 18, 50, 7, 10, 10, 18, 22, 30, 10, 16].map(wch => ({ wch }));
+  ws1['!cols'] = [5, 11, 16, 11, 26, 16, 14, 18, 50, 7, 10, 10, 36, 18, 22, 30, 10, 16].map(wch => ({ wch }));
   XLSX.utils.book_append_sheet(wb, ws1, 'Vụ việc');
 
   const counted = rg.incidents.filter(i => !dupTarget(i, rg.dups));
