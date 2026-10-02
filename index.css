@@ -60,6 +60,12 @@ html, body {
   background-color: #f6f7f9;
   color: #111827;
   overflow-x: hidden;
+  /* Cố định màn hình: không trượt ngang, không phóng to khi chạm đúp, không kéo giãn ngang */
+  max-width: 100%;
+  overscroll-behavior-x: none;
+  touch-action: manipulation;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   -webkit-tap-highlight-color: transparent;
@@ -311,4 +317,12 @@ nav .nav-on { animation: pill-in .3s var(--spring) backwards; }
   .scan-line, .skel::after { animation: none !important; }
   .result-mark path { stroke-dashoffset: 0; }
   .view-enter { left: 0; }
+}
+
+/* iPhone tự phóng to màn hình khi chạm vào ô nhập có chữ nhỏ hơn 16px rồi giữ nguyên trạng thái phóng to,
+   làm màn hình bị lệch, trượt ngang. Trên điện thoại/máy tính bảng: ô nhập luôn 16px. */
+@media (pointer: coarse), (max-width: 767px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), select, textarea {
+    font-size: 16px !important;
+  }
 }

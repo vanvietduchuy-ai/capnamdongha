@@ -1,4 +1,5 @@
 import './lib/install';
+import './lib/lockViewport';
 import './index.css';
 import '@fontsource/be-vietnam-pro/400.css';
 import '@fontsource/be-vietnam-pro/500.css';
