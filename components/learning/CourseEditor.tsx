@@ -1,11 +1,13 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowDown, ArrowUp, FileText, Link2, Loader2, Pencil, Plus, Search, Trash2, Upload, Users, Video } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ArrowDown, ArrowUp, FileText, Link2, Loader2, Pencil, Plus, Search, Trash2, Upload, Users, Video, X } from 'lucide-react';
 import { Learning } from '../../services/learningService';
 import { LearnCourse, LearnLesson, QuizQuestion, User, UserRole, VideoKind } from '../../types';
 import { guessVideoKind, youtubeId } from '../../lib/exam';
 import { ParticipantPicker } from '../ParticipantPicker';
 import { btnPrimary, btnSecondary, Chip, fromLocalInput, inputCls, labelCls, LessonBody, Sheet } from './common';
 import { lessonsOf } from './LearnTab';
+import { isSelectingText, makeQuestionMatcher, useRangeToggle } from '../../lib/questionPick';
+import { TickBox } from './QuestionBank';
 
 interface Props {
   open: boolean;
@@ -166,13 +168,21 @@ const LessonEditor: React.FC<{ lesson: Partial<LearnLesson> | null; questions: Q
   const [preview, setPreview] = useState(false);
   const [qSearch, setQSearch] = useState('');
   const [topic, setTopic] = useState('');
+  const [onlyChosen, setOnlyChosen] = useState(false);
+  const [qLimit, setQLimit] = useState(100);
   const vRef = useRef<HTMLInputElement>(null);
   const pRef = useRef<HTMLInputElement>(null);
-  useEffect(() => { if (lesson) { setL({ ...lesson }); setMsg(''); setPreview(false); setQSearch(''); setTopic(''); } }, [lesson]);
+  useEffect(() => { if (lesson) { setL({ ...lesson }); setMsg(''); setPreview(false); setQSearch(''); setTopic(''); setOnlyChosen(false); setQLimit(100); } }, [lesson]);
 
   const topics = useMemo(() => [...new Set(questions.map(q => q.topic || '').filter(Boolean))].sort(), [questions]);
-  const chosen = new Set(l.questionIds || []);
-  const shown = questions.filter(q => (!topic || q.topic === topic) && (!qSearch || q.text.toLowerCase().includes(qSearch.toLowerCase()))).slice(0, 200);
+  const chosen = useMemo(() => new Set(l.questionIds || []), [l.questionIds]);
+  const shown = useMemo(() => {
+    const match = makeQuestionMatcher(qSearch);
+    return questions.filter(q => (!topic || q.topic === topic) && (!onlyChosen || chosen.has(q.id)) && match(q));
+  }, [questions, topic, onlyChosen, chosen, qSearch]);
+  const shownIds = useMemo(() => shown.map(q => q.id), [shown]);
+  const shownChosen = shownIds.filter(id => chosen.has(id)).length;
+  const allState: 'on' | 'off' | 'some' = !shownChosen ? 'off' : shownChosen === shownIds.length ? 'on' : 'some';
 
   const upload = async (f: File, kind: 'video' | 'pdf') => {
     setUpl(kind); setMsg('');
@@ -193,14 +203,16 @@ const LessonEditor: React.FC<{ lesson: Partial<LearnLesson> | null; questions: Q
     onSaved();
   };
 
-  const toggleQ = (id: string) => {
-    const s = new Set(l.questionIds || []);
-    s.has(id) ? s.delete(id) : s.add(id);
-    const ids = [...s];
-    // Mặc định hỏi 3 câu mỗi lượt (hoặc ít hơn nếu chưa chọn đủ), cần đúng 2/3
-    const n = Math.min(Math.max(l.quizCount || 0, 3), ids.length);
-    setL({ ...l, questionIds: ids, quizCount: n, quizPass: Math.ceil(n * 2 / 3) });
-  };
+  /** Chọn/bỏ nhiều câu; giữ số câu mỗi lượt hợp lệ (mặc định 3, cần đúng 2/3) */
+  const applyQ = useCallback((ids: string[], on: boolean) => setL(prev => {
+    const s = new Set(prev.questionIds || []);
+    ids.forEach(id => on ? s.add(id) : s.delete(id));
+    const all = [...s];
+    const n = Math.min(Math.max(prev.quizCount || 0, 3), all.length);
+    const pass = prev.quizCount === n && prev.quizPass != null && prev.quizPass <= n ? prev.quizPass : Math.ceil(n * 2 / 3);
+    return { ...prev, questionIds: all, quizCount: n, quizPass: pass };
+  }), []);
+  const toggleQ = useRangeToggle(shownIds, chosen, applyQ);
 
   const vkind = l.videoUrl ? (youtubeId(l.videoUrl) ? 'YouTube' : /drive\.google/.test(l.videoUrl) ? 'Google Drive (không đo được % đã xem)' : 'Tệp video') : '';
 
@@ -254,19 +266,41 @@ const LessonEditor: React.FC<{ lesson: Partial<LearnLesson> | null; questions: Q
                 <div><label className="text-[12px] text-stone-600">Mỗi lượt hỏi</label><input type="number" min={0} max={chosen.size} className={inputCls + ' h-9'} value={l.quizCount ?? 0} onChange={e => { const n = Math.max(0, Math.min(chosen.size, Number(e.target.value) || 0)); setL({ ...l, quizCount: n, quizPass: Math.ceil(n * 2 / 3) }); }} data-testid="lesson-quiz-count" /></div>
                 <div><label className="text-[12px] text-stone-600">Cần đúng</label><input type="number" min={0} max={l.quizCount ?? 0} className={inputCls + ' h-9'} value={l.quizPass ?? 0} onChange={e => setL({ ...l, quizPass: Math.max(0, Math.min(l.quizCount ?? 0, Number(e.target.value) || 0)) })} /></div>
               </div>
-              <div className="flex gap-2 mt-2">
-                <select className={inputCls + ' h-9 flex-1'} value={topic} onChange={e => setTopic(e.target.value)}><option value="">Mọi chủ đề</option>{topics.map(t => <option key={t}>{t}</option>)}</select>
+              <div className="grid grid-cols-[1fr_auto] gap-2 mt-2">
+                <select className={inputCls + ' h-10'} value={topic} onChange={e => { setTopic(e.target.value); setQLimit(100); }}><option value="">Mọi chủ đề ({questions.length})</option>{topics.map(t => <option key={t}>{t}</option>)}</select>
+                <button className={`h-10 px-3 rounded-lg border text-[13px] font-semibold ${onlyChosen ? 'border-brand-700 bg-brand-50 text-brand-700' : 'border-stone-300 bg-white text-stone-700'}`} onClick={() => setOnlyChosen(v => !v)} disabled={!chosen.size && !onlyChosen}>Đã chọn</button>
               </div>
-              <div className="relative mt-2"><Search className="w-4 h-4 absolute left-2.5 top-2.5 text-stone-400" /><input className={inputCls + ' h-9 pl-8'} value={qSearch} onChange={e => setQSearch(e.target.value)} placeholder="Tìm câu hỏi" /></div>
-              <div className="mt-2 max-h-72 overflow-y-auto divide-y divide-stone-100 border border-stone-100 rounded">
+              <div className="relative mt-2"><Search className="w-4 h-4 absolute left-2.5 top-3 text-stone-400" />
+                <input className={inputCls + ' h-10 pl-8 pr-8'} value={qSearch} onChange={e => { setQSearch(e.target.value); setQLimit(100); }} placeholder="Tìm câu hỏi (không cần dấu)" data-testid="lesson-q-search" />
+                {qSearch && <button className="absolute right-1.5 top-1.5 p-1.5 rounded hover:bg-stone-100" onClick={() => setQSearch('')} aria-label="Xoá tìm kiếm"><X className="w-4 h-4 text-stone-500" /></button>}
+              </div>
+              {questions.length > 0 && (
+                <div className="flex items-center gap-1 mt-2 flex-wrap">
+                  <button className="inline-flex items-center gap-2 h-9 pl-1 pr-2.5 rounded-lg hover:bg-stone-100 text-[13px] font-semibold text-stone-800 disabled:opacity-40" onClick={() => applyQ(shownIds, allState !== 'on')} disabled={!shownIds.length} data-testid="lesson-q-all">
+                    <TickBox state={allState} className="w-5 h-5" />{allState === 'on' ? `Bỏ chọn ${shownIds.length} câu` : `Chọn tất cả ${shownIds.length} câu`}
+                  </button>
+                  {chosen.size > 0 && <button className="ml-auto h-9 px-2.5 rounded-lg text-[13px] font-semibold text-red-700 hover:bg-red-50" onClick={() => { applyQ([...chosen], false); setOnlyChosen(false); }}>Bỏ chọn hết</button>}
+                </div>
+              )}
+              <div className="mt-1 max-h-80 overflow-y-auto divide-y divide-stone-100 border border-stone-200 rounded-lg">
                 {questions.length === 0 && <div className="p-3 text-[13px] text-stone-500">Ngân hàng chưa có câu hỏi. Vào tab "Ngân hàng câu hỏi" để nhập từ Excel.</div>}
-                {shown.map(q => (
-                  <label key={q.id} className="flex gap-2 p-2 text-[13px] cursor-pointer hover:bg-stone-50" data-testid="lesson-q-option">
-                    <input type="checkbox" className="mt-0.5 accent-brand-700" checked={chosen.has(q.id)} onChange={() => toggleQ(q.id)} />
-                    <span><span className="text-stone-400">{q.topic ? `[${q.topic}] ` : ''}</span>{q.text}</span>
-                  </label>
-                ))}
+                {questions.length > 0 && !shown.length && <div className="p-3 text-[13px] text-stone-500">Không có câu nào khớp.</div>}
+                {shown.slice(0, qLimit).map(q => {
+                  const on = chosen.has(q.id);
+                  return (
+                    <div key={q.id} role="checkbox" aria-checked={on} tabIndex={0} data-testid="lesson-q-option"
+                      onMouseDown={e => { if (e.shiftKey) e.preventDefault(); }}
+                      onClick={e => { if (!isSelectingText()) toggleQ(q.id, e); }}
+                      onKeyDown={e => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); toggleQ(q.id, e); } }}
+                      className={`flex gap-2.5 px-2.5 py-2.5 text-[13px] cursor-pointer outline-none focus-visible:bg-stone-100 ${on ? 'bg-brand-50' : 'hover:bg-stone-50'}`}>
+                      <TickBox state={on ? 'on' : 'off'} className="w-5 h-5" />
+                      <span className="min-w-0"><span className="text-stone-400">{q.topic ? `[${q.topic}] ` : ''}</span>{q.text}</span>
+                    </div>
+                  );
+                })}
+                {shown.length > qLimit && <button className="w-full py-2.5 text-[13px] font-semibold text-brand-700 hover:bg-stone-50" onClick={() => setQLimit(n => n + 200)}>Xem thêm ({shown.length - qLimit} câu)</button>}
               </div>
+              <p className="text-[11px] text-stone-500 mt-1.5">Bấm vào dòng để chọn. Giữ Shift khi bấm để chọn cả đoạn.</p>
             </div>
             {msg && <div className="text-sm text-red-700 bg-red-50 rounded-lg px-3 py-2">{msg}</div>}
           </div>
