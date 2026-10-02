@@ -1439,7 +1439,7 @@ const App: React.FC = () => {
       />
 
       {/* Gợi ý bật thông báo (điện thoại) */}
-      {permissionStatus === 'default' && currentUser && (
+      {permissionStatus === 'default' && currentUser && currentView !== 'DAILY' && (
         <div className="md:hidden fixed left-3 right-3 z-[60] bg-white border border-stone-200 rounded-xl shadow-lg p-3.5"
           style={{ bottom: 'calc(4.75rem + env(safe-area-inset-bottom))' }}>
           <div className="flex items-start gap-3">
