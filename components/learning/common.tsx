@@ -4,6 +4,7 @@ import { Loader2, X, ZoomIn } from 'lucide-react';
 import { Portal } from '../Portal';
 import { QrScanEngine, EngineInfo } from '../../lib/qrScanEngine';
 import { officerPayload, signSlot } from '../../lib/qrCode';
+import { backdropClose } from '../../lib/backdrop';
 
 export const btnPrimary = 'inline-flex items-center justify-center gap-1.5 h-11 px-4 rounded-lg bg-brand-700 hover:bg-brand-800 text-white text-sm font-semibold disabled:opacity-40 disabled:pointer-events-none';
 export const btnSecondary = 'inline-flex items-center justify-center gap-1.5 h-11 px-4 rounded-lg border border-stone-300 bg-white hover:bg-stone-50 text-stone-700 text-sm font-semibold disabled:opacity-40 disabled:pointer-events-none';
@@ -34,7 +35,7 @@ export const Sheet: React.FC<{ open: boolean; onClose: () => void; title: React.
     if (!open) return null;
     return (
       <Portal>
-        <div className="fixed inset-0 z-[110] bg-stone-900/50 flex items-end md:items-center justify-center md:p-6" onClick={onClose}>
+        <div className="fixed inset-0 z-[110] bg-stone-900/50 flex items-end md:items-center justify-center md:p-6" {...backdropClose(onClose)}>
           <div data-testid={testId} onClick={e => e.stopPropagation()}
             className={`bg-white w-full ${wide ? 'md:max-w-5xl' : 'md:max-w-xl'} rounded-t-2xl md:rounded-2xl shadow-2xl flex flex-col`}
             style={{ maxHeight: 'min(94dvh, 100%)' }}>

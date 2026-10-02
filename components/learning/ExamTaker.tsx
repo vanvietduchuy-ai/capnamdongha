@@ -7,6 +7,7 @@ import { fmtClock, fmtScore, getDeviceId, getDeviceLabel, grade, LETTERS } from 
 import { btnPrimary, btnSecondary, QrScanBox } from './common';
 import { haptic, ResultMark } from '../UI';
 import { LOGO_URL } from '../../lib/brand';
+import { backdropClose } from '../../lib/backdrop';
 
 interface Props { exam: Exam; me: User; onClose: () => void; }
 
@@ -307,7 +308,7 @@ export const ExamTaker: React.FC<Props> = ({ exam, me, onClose }) => {
 
         {/* Bảng câu */}
         {palette && (
-          <div className="fixed inset-0 z-[150] bg-stone-900/50 flex items-end md:items-center justify-center" onClick={() => setPalette(false)}>
+          <div className="fixed inset-0 z-[150] bg-stone-900/50 flex items-end md:items-center justify-center" {...backdropClose(() => setPalette(false))}>
             <div className="bg-white w-full md:max-w-md rounded-t-2xl md:rounded-2xl p-4" onClick={e => e.stopPropagation()} style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}>
               <div className="font-bold mb-3">Đã làm {answeredN}/{qs.length} câu</div>
               <div className="grid grid-cols-6 gap-2">
