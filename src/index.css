@@ -1,0 +1,64 @@
+@import "@fontsource/be-vietnam-pro/vietnamese-400.css";
+@import "@fontsource/be-vietnam-pro/latin-400.css";
+@import "@fontsource/be-vietnam-pro/vietnamese-500.css";
+@import "@fontsource/be-vietnam-pro/latin-500.css";
+@import "@fontsource/be-vietnam-pro/vietnamese-600.css";
+@import "@fontsource/be-vietnam-pro/latin-600.css";
+@import "@fontsource/be-vietnam-pro/vietnamese-700.css";
+@import "@fontsource/be-vietnam-pro/latin-700.css";
+@import "@fontsource/be-vietnam-pro/vietnamese-800.css";
+@import "@fontsource/be-vietnam-pro/latin-800.css";
+/* Tinos: thay thế Times New Roman (cùng số đo) cho trang A4 trên máy không có font */
+@import "@fontsource/tinos/vietnamese-400.css";
+@import "@fontsource/tinos/latin-400.css";
+@import "@fontsource/tinos/vietnamese-400-italic.css";
+@import "@fontsource/tinos/latin-400-italic.css";
+@import "@fontsource/tinos/vietnamese-700.css";
+@import "@fontsource/tinos/latin-700.css";
+@import "@fontsource/tinos/vietnamese-700-italic.css";
+@import "@fontsource/tinos/latin-700-italic.css";
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Be Vietnam Pro", system-ui, sans-serif;
+  --font-mono: "Be Vietnam Pro", system-ui, sans-serif;
+
+  /* Bộ màu thống nhất: đỏ Đảng (nền đậm, nút chính) + vàng (điểm nhấn) + chữ đen ấm */
+  --color-den: #1F1A17;          /* chữ chính */
+  --color-ink: #5C0A0E;          /* nền đậm: thanh menu, khối nổi bật, nút chính */
+  --color-ink-2: #7A1015;
+  --color-ink-3: #470709;
+  --color-vang: #F2C230;
+  --color-vang-nhat: #FDE68A;
+  --color-nen: #F4F2ED;
+  --color-nen-2: #FAF9F5;
+  --color-nen-3: #EAE6DC;
+  --color-vien: #E2DED4;
+  --color-vien-2: #D6D1C4;
+  --color-mo: #5B6170;
+  --color-mo-2: #3D4350;
+  --color-do: #A4161A;
+  --color-do-2: #8A1216;
+  --color-xanh: #1E3A8A;
+  --color-xanh-nhat: #DCE8FF;
+  --color-cam: #B45309;
+  --color-cam-dam: #92400E;
+  --color-cam-nhat: #FEF3C7;
+  --color-nguy: #9F1239;
+  --color-nguy-nhat: #FCE7EC;
+}
+
+@layer base {
+  html, body, #root { min-height: 100%; }
+  body {
+    margin: 0;
+    background: var(--color-nen);
+    color: var(--color-den);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  input, select, textarea, button { font: inherit; }
+  :focus-visible { outline: 2px solid #A4161A; outline-offset: 2px; }
+}
+.so { font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }

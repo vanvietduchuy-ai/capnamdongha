@@ -1,0 +1,14 @@
+{
+  "name": "Hệ thống điều hành BCĐ 57 – phường Nam Đông Hà",
+  "short_name": "BCĐ 57",
+  "description": "Theo dõi báo cáo, nhiệm vụ, chỉ tiêu Đề án 06",
+  "lang": "vi",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F4F2ED",
+  "theme_color": "#A4161A",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
