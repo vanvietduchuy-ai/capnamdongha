@@ -121,7 +121,7 @@ export const DailyBoardView: React.FC<Props> = ({ initialDay, deadline }) => {
                     </div>
                   ) : (
                     <div className="text-[13px] text-stone-600 mt-1">
-                      {u.mainName ? <>Phân công: đ/c {u.mainName}{u.backupName ? ` (dự phòng: ${u.backupName})` : ''}</> : <span className="text-red-700">Chưa phân công người báo cáo</span>}
+                      <span className="text-red-700">Chưa có ai báo cáo</span>
                     </div>
                   )}
                   {u.flash.length > 0 && <div className="mt-1"><Chip tone="red">{u.flash.length} báo cáo nhanh</Chip></div>}

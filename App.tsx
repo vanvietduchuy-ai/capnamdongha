@@ -232,7 +232,7 @@ const App: React.FC = () => {
   const installEnv = useInstallEnv();
   const isStandalone = installEnv.standalone;
   const [showInstall, setShowInstall] = useState(false);
-  // Báo cáo ngày: mở thẳng từ link / mã QR (?bao-cao-ngay=CSKV), giữ lại qua bước đăng nhập
+  // Báo cáo ngày: mở thẳng từ link / mã QR chung (?bao-cao-ngay=1), giữ lại qua bước đăng nhập
   const [dailyOpen, setDailyOpen] = useState<string | null>(() => {
     try {
       const q = new URLSearchParams(window.location.search).get('bao-cao-ngay');
@@ -1067,7 +1067,7 @@ const App: React.FC = () => {
   useEffect(() => {
     if (!currentUser || !Daily.available()) { setDailyPending(0); return; }
     let alive = true;
-    const check = () => Daily.me().then(r => { if (alive && r.ok) setDailyPending((r.mine || []).filter(m => !m.reported).length); }).catch(() => { /* bỏ qua */ });
+    const check = () => Daily.me().then(r => { if (alive && r.ok) setDailyPending((r.mine || []).filter(m => m.own && !m.reported).length); }).catch(() => { /* bỏ qua */ });
     check();
     const t = window.setInterval(check, 5 * 60 * 1000);
     return () => { alive = false; window.clearInterval(t); };
@@ -1261,7 +1261,7 @@ const App: React.FC = () => {
           <button onClick={() => goTo('DAILY')} data-testid="home-daily-banner"
             className="w-full mb-4 rounded-xl border-2 border-brand-700/30 bg-brand-50 px-4 py-3 flex items-center gap-3 text-left card-3d">
             <ClipboardCheck className="w-6 h-6 text-brand-700 shrink-0" />
-            <span className="flex-1 text-sm text-stone-800"><b>Đồng chí có {dailyPending} báo cáo ngày chưa nộp.</b> Bấm để báo cáo.</span>
+            <span className="flex-1 text-sm text-stone-800"><b>Tổ của đồng chí chưa báo cáo ngày.</b> Bấm để báo cáo.</span>
             <ChevronRight className="w-5 h-5 text-brand-700" />
           </button>
         )}

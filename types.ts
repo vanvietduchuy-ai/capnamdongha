@@ -400,7 +400,7 @@ export interface MyAttempt {
 // ===================== BÁO CÁO NGÀY =====================
 export type DailyUnit = 'AN_NINH' | 'CSKV' | 'CSTT' | 'PCTP' | 'TBHS' | 'TBDV';
 export type DailyStatus = 'NORMAL' | 'INCIDENT';
-export type DailyRole = 'MAIN' | 'BACKUP' | 'LEADER';
+export type DailyRole = 'LEADER' | 'DUTY';
 
 export interface DailyIncident {
   id?: string;
@@ -454,10 +454,6 @@ export interface DailyFlash {
 export interface DailyUnitInfo {
   unit: DailyUnit;
   unitName: string;
-  mainId?: string | null;
-  mainName?: string | null;
-  backupId?: string | null;
-  backupName?: string | null;
   report: DailyReport | null;
   versions: number;
   flash: DailyFlash[];
@@ -473,6 +469,8 @@ export interface DailyMine {
   status?: DailyStatus | null;
   reporterName?: string | null;
   submittedAt?: number | null;
+  flash?: number;            // số báo cáo nhanh trong kỳ
+  own?: boolean;             // tổ của chính cán bộ đang đăng nhập
 }
 
 export interface DailyOtherIncident {
@@ -480,7 +478,3 @@ export interface DailyOtherIncident {
   location?: string | null; occurredAt?: string | null; summary: string; flash?: boolean;
 }
 
-export interface DailyAssignItem {
-  id: string; unit: DailyUnit; day: string | null; userId: string | null; backupId: string | null;
-  updatedBy?: string; updatedAt?: number;
-}

@@ -6,9 +6,11 @@
 --             Tổ Tổng hợp không báo cáo, chỉ tổng hợp.
 --  KỲ BÁO CÁO "ngày D": từ <giờ chốt> ngày D-1 đến <giờ chốt> ngày D (mặc định 07:30, giờ Việt Nam).
 --             Hạn nộp = giờ chốt ngày D. Nộp sau hạn → ghi "Nộp muộn".
---  NGƯỜI BÁO: người được phân công (chính / dự phòng) của đầu mối trong ngày;
---             với 4 tổ thì Tổ trưởng, Tổ phó của tổ đó cũng báo được.
---             Phải đăng nhập — máy chủ tự xác định người báo, không báo hộ được.
+--  NGƯỜI BÁO: KHÔNG phân công cố định. Dùng chung 1 link / 1 mã QR cho cả đơn vị.
+--             Cán bộ đăng nhập, TỰ CHỌN vai trò (Tổ An ninh, Tổ CSKV, Tổ CSTT, Tổ PCTP,
+--             Trực ban hình sự, Trực ban đơn vị) rồi báo cáo — vì người trực ban, người
+--             báo cáo của các tổ thay đổi hằng ngày.
+--             Phải đăng nhập — máy chủ ghi đúng tên người báo, không báo hộ được.
 --  TRÁCH NHIỆM: mỗi lần nộp là một phiên bản, KHÔNG sửa/xoá được bản đã nộp.
 --             Sửa = nộp bản mới; sau hạn nộp phải ghi lý do đính chính. Lưu đủ lịch sử.
 --  BẢO MẬT:   Mọi bảng của báo cáo ngày KHÔNG đọc/ghi trực tiếp được; chỉ qua hàm có kiểm tra quyền.
@@ -20,15 +22,11 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 -- ---------------------------------------------------------------------
 -- 1. BẢNG
 -- ---------------------------------------------------------------------
--- Phân công: day IS NULL = phân công thường xuyên; day có giá trị = phân công riêng ngày đó (ưu tiên)
-CREATE TABLE IF NOT EXISTS daily_assign (id text PRIMARY KEY);
-ALTER TABLE daily_assign ADD COLUMN IF NOT EXISTS unit        text;
-ALTER TABLE daily_assign ADD COLUMN IF NOT EXISTS day         date;
-ALTER TABLE daily_assign ADD COLUMN IF NOT EXISTS "userId"    text;
-ALTER TABLE daily_assign ADD COLUMN IF NOT EXISTS "backupId"  text;
-ALTER TABLE daily_assign ADD COLUMN IF NOT EXISTS "updatedBy" text;
-ALTER TABLE daily_assign ADD COLUMN IF NOT EXISTS "updatedAt" bigint;
-CREATE INDEX IF NOT EXISTS idx_daily_assign_unit_day ON daily_assign (unit, day);
+-- Bản trước có phân công cố định (bảng daily_assign) — nay bỏ. Xoá các hàm phân công cũ nếu đã chạy bản trước.
+DROP FUNCTION IF EXISTS app_daily_assignments(text, date, date);
+DROP FUNCTION IF EXISTS app_daily_assign(text, text, date, text, text);
+DROP FUNCTION IF EXISTS daily_resp(date, text);
+DROP TABLE IF EXISTS daily_assign;
 
 -- Mỗi lần nộp = 1 dòng (phiên bản). Chỉ 1 phiên bản active cho mỗi (day, unit).
 CREATE TABLE IF NOT EXISTS daily_reports (id text PRIMARY KEY);
@@ -40,7 +38,7 @@ ALTER TABLE daily_reports ADD COLUMN IF NOT EXISTS status         text;     -- N
 ALTER TABLE daily_reports ADD COLUMN IF NOT EXISTS note           text;     -- tình hình chung / ghi chú
 ALTER TABLE daily_reports ADD COLUMN IF NOT EXISTS "reporterId"   text;
 ALTER TABLE daily_reports ADD COLUMN IF NOT EXISTS "reporterName" text;
-ALTER TABLE daily_reports ADD COLUMN IF NOT EXISTS "reporterRole" text;     -- MAIN | BACKUP | LEADER
+ALTER TABLE daily_reports ADD COLUMN IF NOT EXISTS "reporterRole" text;     -- LEADER (lãnh đạo tổ) | DUTY (cán bộ tự chọn vai trò)
 ALTER TABLE daily_reports ADD COLUMN IF NOT EXISTS "submittedAt"  bigint;
 ALTER TABLE daily_reports ADD COLUMN IF NOT EXISTS late           boolean DEFAULT false;
 ALTER TABLE daily_reports ADD COLUMN IF NOT EXISTS reason         text;     -- lý do đính chính (sau hạn)
@@ -99,12 +97,11 @@ ON CONFLICT (key) DO NOTHING;
 -- ---------------------------------------------------------------------
 -- 2. QUYỀN TRUY CẬP: không ai đọc/ghi trực tiếp
 -- ---------------------------------------------------------------------
-ALTER TABLE daily_assign    ENABLE ROW LEVEL SECURITY;
 ALTER TABLE daily_reports   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE daily_incidents ENABLE ROW LEVEL SECURITY;
 ALTER TABLE daily_flash     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE daily_dups      ENABLE ROW LEVEL SECURITY;
-REVOKE ALL ON daily_assign, daily_reports, daily_incidents, daily_flash, daily_dups FROM anon, authenticated;
+REVOKE ALL ON daily_reports, daily_incidents, daily_flash, daily_dups FROM anon, authenticated;
 
 -- ---------------------------------------------------------------------
 -- 3. HÀM NỘI BỘ
@@ -161,25 +158,15 @@ LANGUAGE sql STABLE AS $$
               ELSE (now() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date + 1 END
 $$;
 
--- Người được phân công (phân công riêng ngày ưu tiên hơn phân công thường xuyên)
-CREATE OR REPLACE FUNCTION daily_resp(p_day date, p_unit text, OUT main text, OUT backup text)
-LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
-  SELECT a."userId", a."backupId" FROM daily_assign a
-   WHERE a.unit = p_unit AND (a.day = p_day OR a.day IS NULL)
-   ORDER BY a.day IS NULL, a."updatedAt" DESC NULLS LAST
-   LIMIT 1
-$$;
-
--- Vai trò của cán bộ với đầu mối trong ngày: MAIN | BACKUP | LEADER | NULL
+-- Vai trò khi báo cáo: mọi cán bộ đã duyệt (trừ tài khoản quản trị kỹ thuật) tự chọn đầu mối để báo.
+--   LEADER = Tổ trưởng/Tổ phó của tổ đó; DUTY = cán bộ tự chọn vai trò (trực ban, cán bộ của tổ…); NULL = không được báo
 CREATE OR REPLACE FUNCTION daily_role(u users, p_day date, p_unit text) RETURNS text
 LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public AS $$
-DECLARE r record;
 BEGIN
-  SELECT * INTO r FROM daily_resp(p_day, p_unit);
-  IF r.main IS NOT NULL AND r.main = u.id THEN RETURN 'MAIN'; END IF;
-  IF r.backup IS NOT NULL AND r.backup = u.id THEN RETURN 'BACKUP'; END IF;
+  IF u.id IS NULL OR u.role = 'ADMIN' OR NOT coalesce(u."isApproved", true) THEN RETURN NULL; END IF;
+  IF NOT (p_unit = ANY (daily_units())) THEN RETURN NULL; END IF;
   IF daily_is_leader(u, p_unit) THEN RETURN 'LEADER'; END IF;
-  RETURN NULL;
+  RETURN 'DUTY';
 END;
 $$;
 
@@ -230,14 +217,11 @@ $$;
 -- Tình hình 1 đầu mối trong 1 ngày
 CREATE OR REPLACE FUNCTION daily_unit_json(p_day date, p_unit text) RETURNS jsonb
 LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public AS $$
-DECLARE r record; rep daily_reports%ROWTYPE;
+DECLARE rep daily_reports%ROWTYPE;
 BEGIN
-  SELECT * INTO r FROM daily_resp(p_day, p_unit);
   SELECT * INTO rep FROM daily_reports WHERE day = p_day AND unit = p_unit AND active ORDER BY version DESC LIMIT 1;
   RETURN jsonb_build_object(
     'unit', p_unit, 'unitName', daily_unit_name(p_unit),
-    'mainId', r.main, 'mainName', daily_uname(r.main),
-    'backupId', r.backup, 'backupName', daily_uname(r.backup),
     'report', CASE WHEN rep.id IS NULL THEN NULL ELSE daily_report_json(rep) END,
     'versions', (SELECT count(*) FROM daily_reports WHERE day = p_day AND unit = p_unit),
     'flash', coalesce((SELECT jsonb_agg(to_jsonb(f) ORDER BY f."createdAt") FROM daily_flash f WHERE f.day = p_day AND f.unit = p_unit), '[]'::jsonb));
@@ -248,7 +232,7 @@ $$;
 -- 4. HÀM GỌI TỪ ỨNG DỤNG
 -- ---------------------------------------------------------------------
 
--- Cấu hình + việc của tôi hôm nay
+-- Cấu hình + tình hình báo cáo kỳ đang mở của 6 đầu mối (để cán bộ chọn vai trò báo cáo)
 CREATE OR REPLACE FUNCTION app_daily_me(p_token text)
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions AS $$
 DECLARE actor users%ROWTYPE; d date; prev date; u text; v_role text; mine jsonb := '[]'::jsonb; rep daily_reports%ROWTYPE; v_start date;
@@ -258,16 +242,17 @@ BEGIN
   d := daily_current_day(); prev := d - 1;
   v_start := (SELECT min(day) FROM daily_reports);   -- trước ngày bắt đầu dùng thì không nhắc nộp bù
   FOREACH u IN ARRAY daily_units() LOOP
-    -- Kỳ đang mở
     v_role := daily_role(actor, d, u);
-    IF v_role IS NOT NULL THEN
-      SELECT * INTO rep FROM daily_reports WHERE day = d AND unit = u AND active LIMIT 1;
-      mine := mine || jsonb_build_object('unit', u, 'unitName', daily_unit_name(u), 'day', d, 'role', v_role,
-                'reported', rep.id IS NOT NULL, 'status', rep.status, 'reporterName', rep."reporterName", 'submittedAt', rep."submittedAt");
-    END IF;
-    -- Kỳ vừa đóng mà chưa báo (nhắc nộp bù)
-    v_role := daily_role(actor, prev, u);
-    IF v_role IS NOT NULL AND v_start IS NOT NULL AND prev >= v_start
+    IF v_role IS NULL THEN CONTINUE; END IF;
+    -- Kỳ đang mở
+    rep := NULL;
+    SELECT * INTO rep FROM daily_reports WHERE day = d AND unit = u AND active LIMIT 1;
+    mine := mine || jsonb_build_object('unit', u, 'unitName', daily_unit_name(u), 'day', d, 'role', v_role,
+              'reported', rep.id IS NOT NULL, 'status', rep.status, 'reporterName', rep."reporterName", 'submittedAt', rep."submittedAt",
+              'flash', (SELECT count(*) FROM daily_flash f WHERE f.day = d AND f.unit = u),
+              'own', daily_unit_dept(u) IS NOT NULL AND daily_unit_dept(u) = actor.department);
+    -- Kỳ vừa đóng mà chưa có ai báo (nộp bù)
+    IF v_start IS NOT NULL AND prev >= v_start
        AND NOT EXISTS (SELECT 1 FROM daily_reports WHERE day = prev AND unit = u AND active) THEN
       mine := mine || jsonb_build_object('unit', u, 'unitName', daily_unit_name(u), 'day', prev, 'role', v_role, 'reported', false, 'overdue', true);
     END IF;
@@ -294,7 +279,7 @@ BEGIN
   IF NOT (p_unit = ANY (daily_units())) THEN RETURN err('Đầu mối báo cáo không hợp lệ.'); END IF;
   v_role := daily_role(actor, p_day, p_unit);
   mgr := can_manage_daily(actor);
-  IF v_role IS NULL AND NOT mgr THEN RETURN err('Bạn không được phân công báo cáo cho ' || daily_unit_name(p_unit) || ' ngày ' || to_char(p_day, 'DD/MM/YYYY') || '.'); END IF;
+  IF v_role IS NULL AND NOT mgr THEN RETURN err('Tài khoản này không dùng để báo cáo ngày.'); END IF;
   -- Vụ việc các đầu mối khác đã báo cùng ngày (tóm tắt, để chọn "trùng với vụ đã có")
   SELECT coalesce(jsonb_agg(jsonb_build_object('key', i.key, 'unit', i.unit, 'unitName', daily_unit_name(i.unit), 'field', i.field,
            'location', i.location, 'occurredAt', i."occurredAt", 'summary', left(i.summary, 200)) ORDER BY i.unit, i.ord), '[]'::jsonb)
@@ -324,7 +309,7 @@ BEGIN
   IF actor.id IS NULL THEN RETURN expired_msg(); END IF;
   IF NOT (p_unit = ANY (daily_units())) THEN RETURN err('Đầu mối báo cáo không hợp lệ.'); END IF;
   v_role := daily_role(actor, p_day, p_unit);
-  IF v_role IS NULL THEN RETURN err('Bạn không được phân công báo cáo cho ' || daily_unit_name(p_unit) || ' ngày ' || to_char(p_day, 'DD/MM/YYYY') || '.'); END IF;
+  IF v_role IS NULL THEN RETURN err('Tài khoản này không dùng để báo cáo ngày (tài khoản quản trị hoặc chưa được duyệt).'); END IF;
   cur := daily_current_day();
   IF p_day > cur THEN RETURN err('Chưa đến kỳ báo cáo ngày ' || to_char(p_day, 'DD/MM/YYYY') || '.'); END IF;
   IF p_day < cur - get_setting('daily_late_days', '7')::int THEN RETURN err('Đã quá thời hạn nộp bù cho ngày này. Liên hệ Tổ Tổng hợp.'); END IF;
@@ -395,7 +380,7 @@ BEGIN
   IF NOT (p_unit = ANY (daily_units())) THEN RETURN err('Đầu mối báo cáo không hợp lệ.'); END IF;
   d := daily_current_day();
   v_role := daily_role(actor, d, p_unit);
-  IF v_role IS NULL THEN RETURN err('Bạn không được phân công báo cáo cho ' || daily_unit_name(p_unit) || ' trong kỳ này.'); END IF;
+  IF v_role IS NULL THEN RETURN err('Tài khoản này không dùng để báo cáo ngày.'); END IF;
   bad := daily_incident_invalid(p_incident);
   IF bad IS NOT NULL THEN RETURN err('Vụ việc ' || bad || '.'); END IF;
   v_key := coalesce(nullif(p_incident->>'key', ''), new_id('ik'));
@@ -484,77 +469,32 @@ BEGIN
 END;
 $$;
 
--- Danh sách phân công (thường xuyên + từng ngày trong khoảng)
-CREATE OR REPLACE FUNCTION app_daily_assignments(p_token text, p_from date, p_to date)
-RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions AS $$
-DECLARE actor users%ROWTYPE;
-BEGIN
-  actor := session_user_row(p_token);
-  IF actor.id IS NULL THEN RETURN expired_msg(); END IF;
-  IF NOT (can_manage_daily(actor) OR EXISTS (SELECT 1 FROM unnest(daily_units()) x WHERE daily_is_leader(actor, x))) THEN
-    RETURN err('Bạn không có quyền xem phân công báo cáo ngày.');
-  END IF;
-  RETURN jsonb_build_object('ok', true,
-    'items', coalesce((SELECT jsonb_agg(to_jsonb(a) ORDER BY a.unit, a.day NULLS FIRST) FROM daily_assign a
-                       WHERE a.day IS NULL OR a.day BETWEEN p_from AND p_to), '[]'::jsonb));
-END;
-$$;
-
--- Phân công: p_day NULL = thường xuyên. p_user_id NULL = bỏ phân công.
--- Tổ trưởng/Tổ phó phân công cho tổ mình; Trực ban hình sự, Trực ban đơn vị do người quản lý báo cáo ngày phân công.
-CREATE OR REPLACE FUNCTION app_daily_assign(p_token text, p_unit text, p_day date, p_user_id text, p_backup_id text)
-RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions AS $$
-DECLARE actor users%ROWTYPE; v_id text; tgt users%ROWTYPE; old_main text;
-BEGIN
-  actor := session_user_row(p_token);
-  IF actor.id IS NULL THEN RETURN expired_msg(); END IF;
-  IF NOT (p_unit = ANY (daily_units())) THEN RETURN err('Đầu mối báo cáo không hợp lệ.'); END IF;
-  IF NOT (can_manage_daily(actor) OR daily_is_leader(actor, p_unit)) THEN
-    RETURN err('Bạn không có quyền phân công báo cáo cho ' || daily_unit_name(p_unit) || '.');
-  END IF;
-  IF p_user_id IS NOT NULL AND p_user_id = p_backup_id THEN RETURN err('Người dự phòng phải khác người báo cáo chính.'); END IF;
-  IF p_user_id IS NOT NULL THEN
-    SELECT * INTO tgt FROM users WHERE id = p_user_id;
-    IF tgt.id IS NULL THEN RETURN err('Không tìm thấy cán bộ được phân công.'); END IF;
-  END IF;
-  v_id := p_unit || '|' || coalesce(p_day::text, 'default');
-  SELECT "userId" INTO old_main FROM daily_assign WHERE id = v_id;
-  IF p_user_id IS NULL AND p_backup_id IS NULL THEN
-    DELETE FROM daily_assign WHERE id = v_id;
-  ELSE
-    INSERT INTO daily_assign (id, unit, day, "userId", "backupId", "updatedBy", "updatedAt")
-    VALUES (v_id, p_unit, p_day, p_user_id, p_backup_id, actor.id, now_ms())
-    ON CONFLICT (id) DO UPDATE SET "userId" = EXCLUDED."userId", "backupId" = EXCLUDED."backupId",
-                                   "updatedBy" = EXCLUDED."updatedBy", "updatedAt" = EXCLUDED."updatedAt";
-  END IF;
-  IF p_user_id IS NOT NULL AND p_user_id IS DISTINCT FROM old_main THEN
-    PERFORM daily_notify(p_user_id, 'Phân công báo cáo ngày',
-      'Đồng chí được phân công báo cáo ngày cho ' || daily_unit_name(p_unit) ||
-      CASE WHEN p_day IS NULL THEN ' (thường xuyên)' ELSE ' ngày ' || to_char(p_day, 'DD/MM/YYYY') END ||
-      '. Hạn nộp ' || to_char(daily_deadline_time(), 'HH24:MI') || ' hằng ngày, mục Báo cáo ngày.');
-  END IF;
-  RETURN jsonb_build_object('ok', true);
-END;
-$$;
-
 -- Nhắc các đầu mối chưa báo cáo kỳ p_day (gửi thông báo trong app). Trả số người đã nhắc.
 CREATE OR REPLACE FUNCTION daily_remind(p_day date) RETURNS int
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions AS $$
-DECLARE u text; r record; n int := 0;
+-- Không phân công cố định nên: 4 tổ → nhắc toàn bộ cán bộ của tổ; Trực ban hình sự / Trực ban đơn vị → nhắc
+-- chỉ huy và Tổ Tổng hợp (người quản lý báo cáo ngày) để liên hệ người đang trực.
+DECLARE u text; uid text; n int := 0; missing text[] := '{}'; msg text;
 BEGIN
   FOREACH u IN ARRAY daily_units() LOOP
     IF NOT EXISTS (SELECT 1 FROM daily_reports WHERE day = p_day AND unit = u AND active) THEN
-      SELECT * INTO r FROM daily_resp(p_day, u);
-      IF r.main IS NOT NULL THEN
-        PERFORM daily_notify(r.main, 'Nhắc báo cáo ngày', daily_unit_name(u) || ' chưa báo cáo ngày ' || to_char(p_day, 'DD/MM/YYYY') ||
-          '. Hạn nộp ' || to_char(daily_deadline_time(), 'HH24:MI') || '.'); n := n + 1;
-      END IF;
-      IF r.backup IS NOT NULL THEN
-        PERFORM daily_notify(r.backup, 'Nhắc báo cáo ngày (dự phòng)', daily_unit_name(u) || ' chưa báo cáo ngày ' || to_char(p_day, 'DD/MM/YYYY') ||
-          '. Nếu người báo cáo chính vắng, đồng chí báo cáo thay.'); n := n + 1;
+      IF daily_unit_dept(u) IS NOT NULL THEN
+        FOR uid IN SELECT x.id FROM users x WHERE x.department = daily_unit_dept(u) AND x.role <> 'ADMIN' AND coalesce(x."isApproved", true) LOOP
+          PERFORM daily_notify(uid, 'Nhắc báo cáo ngày', daily_unit_name(u) || ' chưa báo cáo ngày ' || to_char(p_day, 'DD/MM/YYYY') ||
+            '. Hạn nộp ' || to_char(daily_deadline_time(), 'HH24:MI') || '. Đồng chí được giao báo cáo thì mở mục Báo cáo ngày, chọn vai trò ' ||
+            daily_unit_name(u) || '.'); n := n + 1;
+        END LOOP;
+      ELSE
+        missing := missing || daily_unit_name(u);
       END IF;
     END IF;
   END LOOP;
+  IF array_length(missing, 1) > 0 THEN
+    msg := array_to_string(missing, ', ') || ' chưa báo cáo ngày ' || to_char(p_day, 'DD/MM/YYYY') || '. Đề nghị liên hệ cán bộ đang trực.';
+    FOR uid IN SELECT * FROM daily_managers() LOOP
+      PERFORM daily_notify(uid, 'Nhắc báo cáo ngày (trực ban)', msg); n := n + 1;
+    END LOOP;
+  END IF;
   RETURN n;
 END;
 $$;
@@ -610,15 +550,15 @@ BEGIN
   FOR f IN SELECT p.oid::regprocedure AS sig FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
            WHERE n.nspname = 'public'
              AND p.proname IN ('app_daily_me','app_daily_get','app_daily_submit','app_daily_flash','app_daily_board',
-                               'app_daily_history','app_daily_range','app_daily_mark_dup','app_daily_assignments',
-                               'app_daily_assign','app_daily_remind','app_daily_settings')
+                               'app_daily_history','app_daily_range','app_daily_mark_dup',
+                               'app_daily_remind','app_daily_settings')
   LOOP
     EXECUTE format('REVOKE EXECUTE ON FUNCTION %s FROM PUBLIC', f.sig);
     EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO anon, authenticated', f.sig);
   END LOOP;
   FOR f IN SELECT p.oid::regprocedure AS sig FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
            WHERE n.nspname = 'public'
-             AND p.proname IN ('daily_resp','daily_role','daily_uname','daily_notify','daily_managers','daily_report_json',
+             AND p.proname IN ('daily_role','daily_uname','daily_notify','daily_managers','daily_report_json',
                                'daily_unit_json','daily_remind','daily_deadline_time')
   LOOP
     EXECUTE format('REVOKE EXECUTE ON FUNCTION %s FROM PUBLIC, anon, authenticated', f.sig);

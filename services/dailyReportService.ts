@@ -5,7 +5,7 @@
 import { callRpc, getSessionToken } from '../lib/supabase';
 import { MockDB } from './mockDatabase';
 import {
-  DailyAssignItem, DailyIncident, DailyMine, DailyOtherIncident, DailyReport, DailyStatus, DailyUnit, DailyUnitInfo
+  DailyIncident, DailyMine, DailyOtherIncident, DailyReport, DailyStatus, DailyUnit, DailyUnitInfo
 } from '../types';
 
 const tok = () => getSessionToken();
@@ -41,7 +41,10 @@ export const FIELDS = [
 ];
 export const SEVERITIES = ['Ít nghiêm trọng', 'Nghiêm trọng', 'Rất nghiêm trọng', 'Đặc biệt nghiêm trọng'];
 export const HANDLINGS = ['Đang xác minh, giải quyết', 'Đã giải quyết xong', 'Đã chuyển cơ quan có thẩm quyền', 'Đã báo cáo cấp trên', 'Khác'];
-export const ROLE_TEXT: Record<string, string> = { MAIN: 'Người báo cáo chính', BACKUP: 'Người dự phòng', LEADER: 'Lãnh đạo tổ' };
+export const ROLE_TEXT: Record<string, string> = { LEADER: 'Lãnh đạo tổ', DUTY: 'Cán bộ báo cáo', MAIN: 'Người báo cáo chính', BACKUP: 'Người dự phòng' };
+
+/** Link chung duy nhất mở mục Báo cáo ngày (dùng chung cho mọi tổ, trực ban) */
+export const dailyLink = () => `${typeof window !== 'undefined' ? window.location.origin : ''}/?bao-cao-ngay=1`;
 
 /** Dãy số giống CCCD/CMND/điện thoại (bắt đầu bằng 0, 9–12 chữ số) — máy chủ cũng chặn */
 export const looksLikeId = (s?: string | null) => !!s && /(^|\D)0\d{8,11}(\D|$)/.test(s);
@@ -156,12 +159,6 @@ export const Daily = {
   },
   markDup: (day: string, key: string, dupOf: string | null, clear = false) =>
     callRpc('app_daily_mark_dup', { p_token: tok(), p_day: day, p_key: key, p_dup_of: dupOf || '', p_clear: clear }),
-  assignments: async (from: string, to: string): R<{ items: DailyAssignItem[] }> => {
-    const r = await callRpc<any>('app_daily_assignments', { p_token: tok(), p_from: from, p_to: to });
-    return { ...r, items: arr<DailyAssignItem>(r.items) };
-  },
-  assign: (unit: DailyUnit, day: string | null, userId: string | null, backupId: string | null) =>
-    callRpc('app_daily_assign', { p_token: tok(), p_unit: unit, p_day: day, p_user_id: userId || null, p_backup_id: backupId || null }),
   remind: (day: string) => callRpc<{ sent: number }>('app_daily_remind', { p_token: tok(), p_day: day }),
   setDeadline: (hhmm: string) => callRpc('app_daily_settings', { p_token: tok(), p_deadline: hhmm })
 };
@@ -370,7 +367,7 @@ export const exportDailyWord = async (b: DailyBoard, deadline: string, signer: S
 
   const sec3: Seg[][] = b.units.map(u => {
     const r = u.report;
-    if (!r) return [{ b: u.unitName + ': ' }, `chưa báo cáo${u.mainName ? ` (người được phân công: đồng chí ${u.mainName})` : ' (chưa phân công)'}.`,
+    if (!r) return [{ b: u.unitName + ': ' }, 'chưa báo cáo.',
       ...(u.flash.length ? [' Đã có ', u.flash.length, ' báo cáo nhanh (nêu tại mục II).'] as Seg[] : [])];
     const n = r.incidents.length;
     return [{ b: u.unitName + ': ' }, `đồng chí ${r.reporterName} báo cáo lúc ${vnDateTime(r.submittedAt)}`,

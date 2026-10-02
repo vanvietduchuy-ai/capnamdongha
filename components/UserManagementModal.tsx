@@ -739,7 +739,7 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
                                  perm === UserPermission.MANAGE_WEEKLY_CALENDAR ? 'Quản lý Lịch' :
                                  perm === UserPermission.VIEW_WEEKLY_CALENDAR ? 'Xem Lịch' :
                                  perm === UserPermission.MANAGE_UTILITIES ? 'Quản lý Tiện ích' :
-                                 perm === UserPermission.MANAGE_ATTENDANCE ? 'Quản lý Điểm danh' : perm === UserPermission.MANAGE_LEARNING ? 'Học tập & Thi' : perm === UserPermission.MANAGE_DAILY_REPORT ? 'Quản lý Báo cáo ngày' : 
+                                 perm === UserPermission.MANAGE_ATTENDANCE ? 'Quản lý Điểm danh' : perm === UserPermission.MANAGE_LEARNING ? 'Học tập & Thi' : perm === UserPermission.MANAGE_DAILY_REPORT ? 'Theo dõi, tổng hợp Báo cáo ngày' : 
                                  perm === UserPermission.MANAGE_TASKS ? 'Quản lý Nhiệm vụ' :
                                  perm === UserPermission.VIEW_ALL_TASKS ? 'Xem toàn bộ NV' :
                                  perm === UserPermission.MANAGE_PROPOSALS ? 'Quản lý Đề xuất' : perm}
@@ -914,7 +914,7 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
                                  perm === UserPermission.ASSIGN_TASKS ? 'Giao việc & Phân công' :
                                  perm === UserPermission.VIEW_STATISTICS ? 'Xem Thống kê & Báo cáo' :
                                  perm === UserPermission.MANAGE_UTILITIES ? 'Quản lý Tiện ích' :
-                                 perm === UserPermission.MANAGE_ATTENDANCE ? 'Quản lý Điểm danh' : perm === UserPermission.MANAGE_LEARNING ? 'Học tập & Thi' : perm === UserPermission.MANAGE_DAILY_REPORT ? 'Quản lý Báo cáo ngày' : 
+                                 perm === UserPermission.MANAGE_ATTENDANCE ? 'Quản lý Điểm danh' : perm === UserPermission.MANAGE_LEARNING ? 'Học tập & Thi' : perm === UserPermission.MANAGE_DAILY_REPORT ? 'Theo dõi, tổng hợp Báo cáo ngày' : 
                                  perm === UserPermission.MANAGE_TASKS ? 'Quản lý toàn bộ nhiệm vụ' :
                                  perm === UserPermission.VIEW_ALL_TASKS ? 'Xem toàn bộ nhiệm vụ' :
                                  perm === UserPermission.MANAGE_PROPOSALS ? 'Quản lý đề xuất' : perm}

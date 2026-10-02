@@ -116,7 +116,7 @@ export const DailyForm: React.FC<Props> = ({ me, day, unit, deadline, clockOffse
 
   const header = (
     <div className="flex items-start gap-2 mb-4">
-      <button onClick={onBack} className="p-2 -ml-2 rounded-lg hover:bg-stone-100" aria-label="Quay lại"><ChevronLeft className="w-5 h-5" /></button>
+      <button onClick={onBack} className="p-2 -ml-2 rounded-lg hover:bg-stone-100" aria-label="Quay lại, chọn vai trò khác"><ChevronLeft className="w-5 h-5" /></button>
       <div className="min-w-0 flex-1">
         <div className="font-bold text-stone-900 text-lg leading-tight">Báo cáo ngày · {unitName(unit)}</div>
         <div className="text-[13px] text-stone-500">{weekdayText(day)}, {dayText(day)} · Kỳ báo cáo {periodText(day, deadline)}</div>
@@ -164,11 +164,11 @@ export const DailyForm: React.FC<Props> = ({ me, day, unit, deadline, clockOffse
   return (
     <div className="max-w-3xl pb-4" data-testid="daily-form">
       {header}
-      {!canSubmit && <div className="mb-3 rounded-lg bg-amber-50 text-amber-900 px-4 py-3 text-sm">Đồng chí không được phân công báo cáo cho đầu mối này nên chỉ xem được.</div>}
+      {!canSubmit && <div className="mb-3 rounded-lg bg-amber-50 text-amber-900 px-4 py-3 text-sm">Tài khoản này không dùng để báo cáo ngày nên chỉ xem được.</div>}
       <div className={`mb-3 rounded-lg px-4 py-2.5 text-sm flex items-center gap-2 ${past ? 'bg-red-50 text-red-800' : 'bg-stone-100 text-stone-700'}`}>
         <Clock className="w-4 h-4 shrink-0" />
         {past ? <span>Đã quá hạn nộp ({vnDateTime(deadlineAt)}). Báo cáo sẽ ghi <b>nộp muộn</b>{rep ? ', đính chính phải ghi lý do' : ''}.</span>
-          : <span>Hạn nộp <b>{vnDateTime(deadlineAt)}</b>{left > 0 ? ` · còn ${fmtLeft(left)}` : ''}. {info.role ? `Đồng chí báo cáo với vai trò ${ROLE_TEXT[info.role]?.toLowerCase()}.` : ''}</span>}
+          : <span>Hạn nộp <b>{vnDateTime(deadlineAt)}</b>{left > 0 ? ` · còn ${fmtLeft(left)}` : ''}. Đồng chí đang báo cáo với vai trò <b>{unitName(unit)}</b>.</span>}
       </div>
       {rep && <div className="mb-3 rounded-lg bg-blue-50 text-blue-900 px-4 py-2.5 text-sm">Đang đính chính bản đã nộp lúc {vnDateTime(rep.submittedAt)} (phiên bản {rep.version}, đ/c {rep.reporterName}). Bản cũ vẫn được lưu.</div>}
 
@@ -221,7 +221,7 @@ export const DailyForm: React.FC<Props> = ({ me, day, unit, deadline, clockOffse
             <label className={`flex gap-3 items-start rounded-xl border-2 p-3 cursor-pointer ${confirm ? 'border-brand-700 bg-brand-50' : 'border-stone-200 bg-white'}`} data-testid="daily-confirm">
               <input type="checkbox" className="mt-1 w-5 h-5 accent-brand-700 shrink-0" checked={confirm} onChange={e => { setConfirm(e.target.checked); setMsg(''); }} />
               <span className="text-sm text-stone-800">
-                Tôi, <b>{me.fullName}</b>, xác nhận {status === 'NORMAL'
+                Tôi, <b>{me.fullName}</b>, báo cáo với vai trò <b>{unitName(unit)}</b>, xác nhận {status === 'NORMAL'
                   ? <>trong kỳ báo cáo, lĩnh vực, địa bàn do <b>{unitName(unit)}</b> phụ trách <b>không phát sinh vụ việc</b></>
                   : <>nội dung <b>{incidents.length} vụ việc</b> nêu trên là đầy đủ, chính xác</>} và chịu trách nhiệm trước Ban Chỉ huy Công an phường về kết quả báo cáo này.
               </span>

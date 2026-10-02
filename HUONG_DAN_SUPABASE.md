@@ -18,7 +18,7 @@ Vào dự án Supabase của đơn vị → **SQL Editor** → dán và chạy *
 | 6 | `06_ma_qr_dong.sql` | Mã QR có chữ ký máy chủ, đổi **3 giây/lần**, máy chủ kiểm tra từng lần quét |
 | 7 | `07_so_do_cho_ngoi.sql` | Sơ đồ chỗ ngồi, **Đối sánh sơ đồ chỗ ngồi**, đánh dấu nghi vấn |
 | 8 | `08_hoc_tap_thi.sql` | **Học tập & Thi**: ngân hàng câu hỏi, khoá học, bài học, kỳ thi chống gian lận, kho tệp `hoc-tap` |
-| 9 | `09_bao_cao_ngay.sql` | **Báo cáo ngày**: phân công, báo cáo tình hình ANTT hằng ngày, báo cáo nhanh, tổng hợp |
+| 9 | `09_bao_cao_ngay.sql` | **Báo cáo ngày**: 1 mã QR chung, cán bộ tự chọn vai trò báo cáo tình hình ANTT hằng ngày, báo cáo nhanh, tổng hợp |
 
 - Cả 9 file an toàn khi chạy lại. **Nếu chạy lại, luôn chạy đủ theo thứ tự.** Đặc biệt: đã chạy lại file 04 thì **bắt buộc chạy lại 05 và 06** ngay sau đó (nếu không, mã QR sẽ mất lớp kiểm tra chữ ký).
 - Đơn vị đã chạy 01–08: chỉ cần chạy thêm **09_bao_cao_ngay.sql** (chạy lúc nào cũng được), rồi triển khai bản web mới.
@@ -316,21 +316,19 @@ Mục **Báo cáo ngày** trên menu. **6 đầu mối** báo cáo: Tổ An ninh
 
 - Kỳ báo cáo "ngày D" tính từ **07 giờ 30 ngày D-1 đến 07 giờ 30 ngày D**. Hạn nộp là 07 giờ 30 ngày D.
 - Nộp sau hạn vẫn được (tối đa 7 ngày) nhưng bị ghi **nộp muộn**.
-- Đổi giờ chốt: Trưởng CAP hoặc Quản trị viên vào thẻ **Phân công** → mục **Giờ chốt**.
-- Nếu Supabase đã bật pg_cron (Integrations → Cron), app **tự nhắc** lúc 07 giờ 00 những người chưa báo. Đổi giờ chốt thì sửa giờ nhắc ở đó. Ngoài ra người theo dõi có thể bấm **Nhắc đầu mối chưa báo** bất cứ lúc nào.
+- Đổi giờ chốt: Trưởng CAP hoặc Quản trị viên vào thẻ **Mã QR** → mục **Giờ chốt**.
+- Nếu Supabase đã bật pg_cron (Integrations → Cron), app **tự nhắc** lúc 07 giờ 00: đầu mối là tổ thì nhắc toàn bộ cán bộ của tổ; Trực ban hình sự, Trực ban đơn vị chưa báo thì nhắc chỉ huy và người theo dõi báo cáo ngày để liên hệ người đang trực. Đổi giờ chốt thì sửa giờ nhắc ở đó. Ngoài ra người theo dõi có thể bấm **Nhắc đầu mối chưa báo** bất cứ lúc nào.
 
-**Phân công** (thẻ **Phân công**)
+**Không phân công cố định — 1 link, 1 mã QR chung** (thẻ **Mã QR**)
 
-- **Phân công thường xuyên**: mỗi đầu mối 1 người báo cáo chính và 1 người dự phòng.
-  - Tổ trưởng, Tổ phó phân công cho tổ mình.
-  - Trực ban hình sự, Trực ban đơn vị do người quản lý báo cáo ngày phân công.
-- **Lịch theo ngày**: bấm vào ô để phân công riêng cho ngày đó. Dùng cho trực ban thay đổi theo lịch trực.
-- Tổ trưởng, Tổ phó luôn báo được cho tổ mình. Ngoài những người này và người được phân công, không ai báo được.
-- **Link và mã QR**: mỗi đầu mối có link `/?bao-cao-ngay=CSKV`… và mã QR in được. Link chỉ mở thẳng biểu mẫu; người báo **vẫn phải đăng nhập tài khoản của mình**, nên luôn biết chính xác ai báo.
+- Cả đơn vị dùng chung **1 link** `/?bao-cao-ngay=1` và **1 mã QR** (in dán tại phòng trực ban, trụ sở). Không tạo link, mã QR riêng cho từng tổ.
+- Vì người trực ban đơn vị, trực ban hình sự và người báo cáo của các tổ thay đổi hằng ngày, **cán bộ tự chọn vai trò** khi vào báo cáo: Tổ An ninh, Tổ CSKV, Tổ CSTT, Tổ PCTP, Trực ban hình sự hoặc Trực ban đơn vị.
+- Người báo **phải đăng nhập tài khoản của mình**. App ghi họ tên, giờ nộp, vai trò đã chọn nên luôn biết chính xác ai báo, ai chịu trách nhiệm.
+- Màn hình chọn vai trò hiện ngay đầu mối nào **đã có người báo** (tên, giờ) hoặc **chưa báo**; tổ của chính cán bộ có nhãn **Tổ của tôi**.
 
-**Người báo cáo** (thẻ **Báo cáo của tôi**, trang chủ có dòng nhắc khi chưa nộp)
+**Người báo cáo** (thẻ **Báo cáo**; trang chủ có dòng nhắc khi tổ của mình chưa nộp)
 
-1. Chọn **Bình thường** hoặc **Có vụ việc**.
+1. Chọn **vai trò** (tổ hoặc trực ban), rồi chọn **Bình thường** hoặc **Có vụ việc**.
 2. Có vụ việc thì nhập từng vụ:
    - lĩnh vực (danh mục cố định), mức độ, thời gian, địa điểm, nội dung;
    - số vụ, số đối tượng, bị hại;
@@ -342,7 +340,9 @@ Mục **Báo cáo ngày** trên menu. **6 đầu mối** báo cáo: Tổ An ninh
 - **Báo cáo nhanh**: dùng khi có vụ việc nghiêm trọng. Chỉ huy và Tổ Tổng hợp nhận thông báo ngay; vụ việc tự đưa vào báo cáo ngày. Đã có báo cáo nhanh thì không báo "Bình thường" được.
 - **Không nhập họ tên, số CCCD, số điện thoại** của đối tượng, bị hại. Máy chủ từ chối dãy số giống số định danh, số điện thoại.
 
-**Theo dõi, tổng hợp** (Trưởng/Phó Trưởng CAP, Tổ trưởng/Tổ phó Tổ Tổng hợp, Quản trị viên, hoặc cán bộ được cấp quyền **Quản lý Báo cáo ngày**; Tổ trưởng các tổ chỉ xem tổ mình)
+**Theo dõi, tổng hợp** (Trưởng/Phó Trưởng CAP, Tổ trưởng/Tổ phó Tổ Tổng hợp, Quản trị viên, hoặc cán bộ được Quản trị viên cấp quyền **Theo dõi, tổng hợp Báo cáo ngày**; Tổ trưởng các tổ chỉ xem tổ mình)
+
+- **Cấp quyền**: Quản trị viên vào **Quản lý cán bộ** → sửa cán bộ → **Phân quyền chức năng** → tích **Theo dõi, tổng hợp Báo cáo ngày** → Lưu. Cán bộ được cấp quyền có đủ các thẻ **Theo dõi**, **Tổng hợp**, **Mã QR** (in, gửi link chung), được nhắc đầu mối chưa báo, gộp vụ trùng, xuất Word/Excel.
 
 - Thẻ **Theo dõi**:
   - 6 ô xanh/cam/đỏ theo trạng thái báo cáo, số vụ việc, số đối tượng, nộp muộn, báo cáo nhanh;
@@ -364,7 +364,7 @@ Mục **Báo cáo ngày** trên menu. **6 đầu mối** báo cáo: Tổ An ninh
 - [ ] Học tập & Thi: nhập thử ngân hàng câu hỏi từ mẫu Excel; tạo 1 kỳ thi thử với 2–3 người trước khi thi thật.
 - [ ] Kiểm tra danh sách cán bộ, **điền email** cho từng người (cần cho quên mật khẩu).
 - [ ] Cấp quyền "Quản lý điểm danh" cho cán bộ trực tiếp tổ chức hội nghị (nếu không phải Trưởng/Phó).
-- [ ] Báo cáo ngày: phân công người báo cáo cho 6 đầu mối (thẻ Phân công), in mã QR, chạy thử 1–2 tuần song song cách báo cáo cũ.
+- [ ] Báo cáo ngày: cấp quyền **Theo dõi, tổng hợp Báo cáo ngày** cho cán bộ phụ trách (nếu không phải chỉ huy, lãnh đạo Tổ Tổng hợp), in 1 mã QR chung (thẻ Mã QR), chạy thử 1–2 tuần song song cách báo cáo cũ.
 - [ ] Triển khai `Mailer.gs`, khai báo `mailer_url`, `mailer_key` (nếu dùng đăng ký/quên mật khẩu).
 - [ ] Chạy thử: tạo hội nghị, chọn 3–4 người, Bắt đầu, cho 1 khách mời quét mã, Kết thúc; xuất Word + Excel.
 - [ ] Thử trên cả Android và iPhone: quét mã, camera được cấp quyền, phần mềm chạy trên HTTPS (link Vercel).
