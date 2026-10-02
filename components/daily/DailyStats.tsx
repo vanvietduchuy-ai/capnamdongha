@@ -60,9 +60,9 @@ export const DailyStats: React.FC<{ currentDay: string }> = ({ currentDay }) => 
 
   return (
     <div data-testid="daily-stats">
-      <div className="flex flex-wrap gap-1.5 mb-3">
+      <div className="flex gap-1.5 mb-3 overflow-x-auto -mx-3 px-3 md:mx-0 md:px-0 md:flex-wrap" style={{ scrollbarWidth: 'none' }}>
         {presets.map(([p, l]) => (
-          <button key={p} onClick={() => applyPreset(p)} className={`h-9 px-3 rounded-full text-sm font-semibold border ${preset === p ? 'bg-stone-900 text-white border-stone-900' : 'bg-white border-stone-300 text-stone-700'}`}>{l}</button>
+          <button key={p} onClick={() => applyPreset(p)} className={`h-9 px-3.5 shrink-0 rounded-full text-[14px] font-semibold border ${preset === p ? 'bg-stone-900 text-white border-stone-900' : 'bg-white border-stone-300 text-stone-700'}`}>{l}</button>
         ))}
       </div>
       {preset === 'CUSTOM' && (
@@ -72,40 +72,38 @@ export const DailyStats: React.FC<{ currentDay: string }> = ({ currentDay }) => 
           <input type="date" className={`${inputCls} w-auto`} value={to} min={from} max={today} onChange={e => e.target.value && setTo(e.target.value)} />
         </div>
       )}
-      <div className="text-sm text-stone-600 mb-3">Số liệu <b>{label}</b>. Vụ việc được đánh dấu trùng không cộng vào tổng.</div>
+      <div className="text-[13px] text-stone-500 mb-3">{dayText(from)} – {dayText(to)}</div>
 
       {err && <div className="rounded-lg bg-red-50 text-red-800 px-4 py-3 text-sm">{err}</div>}
       {loading && <div className="py-8 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-stone-400" /></div>}
       {rg && tot && !loading && (
         <>
-          <div className="flex flex-wrap gap-2 mb-4">
-            <button className={btnPrimary} onClick={() => setSignOpen(true)} data-testid="stats-word"><FileText className="w-4 h-4" />Xuất Word tổng hợp</button>
+          <div className="grid grid-cols-2 md:flex gap-2 mb-3">
+            <button className={btnPrimary} onClick={() => setSignOpen(true)} data-testid="stats-word"><FileText className="w-4 h-4" />Xuất Word</button>
             <button className={btnSecondary} onClick={() => exportRangeExcel(rg, label)} data-testid="stats-excel"><Download className="w-4 h-4" />Xuất Excel</button>
           </div>
 
-          <div className="grid grid-cols-3 gap-2.5 mb-4">
-            <div className={`${card} p-3`}><div className="text-[12px] text-stone-500">Vụ việc</div><div className="text-2xl font-bold tabular">{tot.cases}</div></div>
-            <div className={`${card} p-3`}><div className="text-[12px] text-stone-500">Đối tượng</div><div className="text-2xl font-bold tabular">{tot.suspects}</div></div>
-            <div className={`${card} p-3`}><div className="text-[12px] text-stone-500">Bị hại, thương vong</div><div className="text-2xl font-bold tabular">{tot.victims}</div></div>
+          <div className="grid grid-cols-3 gap-2 mb-3">
+            {([['Vụ việc', tot.cases], ['Đối tượng', tot.suspects], ['Bị hại', tot.victims]] as [string, number][]).map(([l, v]) => (
+              <div key={l} className={`${card} px-2 py-2 text-center md:text-left md:p-3`}><div className="text-[11px] md:text-[12px] text-stone-500">{l}</div><div className="text-xl md:text-2xl font-bold tabular">{v}</div></div>))}
           </div>
 
-          <div className={`${card} p-3 md:p-4 mb-4 overflow-x-auto`}>
-            <div className="font-bold text-stone-900 mb-2">Chấp hành chế độ báo cáo</div>
-            <table className="w-full text-sm min-w-[520px]">
-              <thead><tr className="text-left text-[12px] text-stone-500 border-b border-stone-200">
-                <th className="py-1.5 pr-2">Đầu mối</th><th className="py-1.5 px-2 text-center">Phải báo</th><th className="py-1.5 px-2 text-center">Đã báo</th>
-                <th className="py-1.5 px-2 text-center">Không báo</th><th className="py-1.5 px-2 text-center">Nộp muộn</th><th className="py-1.5 pl-2 text-center">Ngày có vụ việc</th></tr></thead>
+          <div className={`${card} p-3 md:p-4 mb-3`}>
+            <div className="font-bold text-stone-900 mb-1.5">Chấp hành báo cáo</div>
+            <table className="w-full text-[14px]">
+              <thead><tr className="text-left text-[11px] md:text-[12px] text-stone-500 border-b border-stone-200">
+                <th className="py-1.5 pr-1 font-semibold">Đầu mối</th><th className="py-1.5 px-1 text-center font-semibold">Phải</th><th className="py-1.5 px-1 text-center font-semibold">Đã</th>
+                <th className="py-1.5 px-1 text-center font-semibold">Không</th><th className="py-1.5 px-1 text-center font-semibold">Muộn</th><th className="py-1.5 pl-1 text-center font-semibold">Có VV</th></tr></thead>
               <tbody>{comp.map(c => (
                 <tr key={c.unit} className="border-b border-stone-100" data-testid="stats-comp-row">
-                  <td className="py-1.5 pr-2 font-semibold">{c.name}</td>
-                  <td className="py-1.5 px-2 text-center tabular">{c.days}</td>
-                  <td className="py-1.5 px-2 text-center tabular">{c.reported}</td>
-                  <td className={`py-1.5 px-2 text-center tabular ${c.missing ? 'text-red-700 font-bold' : ''}`}>{c.missing}</td>
-                  <td className={`py-1.5 px-2 text-center tabular ${c.late ? 'text-amber-700 font-bold' : ''}`}>{c.late}</td>
-                  <td className="py-1.5 pl-2 text-center tabular">{c.incidentDays}</td>
+                  <td className="py-2 pr-1 font-semibold leading-tight">{c.name}</td>
+                  <td className="py-2 px-1 text-center tabular">{c.days}</td>
+                  <td className="py-2 px-1 text-center tabular">{c.reported}</td>
+                  <td className={`py-2 px-1 text-center tabular ${c.missing ? 'text-red-700 font-bold' : ''}`}>{c.missing}</td>
+                  <td className={`py-2 px-1 text-center tabular ${c.late ? 'text-amber-700 font-bold' : ''}`}>{c.late}</td>
+                  <td className="py-2 pl-1 text-center tabular">{c.incidentDays}</td>
                 </tr>))}</tbody>
             </table>
-            <p className="text-[12px] text-stone-500 mt-2">Kỳ đang mở (chưa đến hạn) không tính là "không báo".</p>
           </div>
 
           <div className={`${card} p-3 md:p-4 mb-4 overflow-x-auto`}>

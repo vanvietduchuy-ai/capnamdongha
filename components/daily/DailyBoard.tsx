@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { BellRing, ChevronLeft, ChevronRight, FileText, History, Loader2, RefreshCw, Siren } from 'lucide-react';
 import { DailyIncident, DailyReport, DailyUnit } from '../../types';
 import {
-  addDays, boardIncidents, Daily, DailyBoard as Board, dayText, dupTarget, exportDailyWord, periodText, ROLE_TEXT, Signer, totalsByField, unitName, vnDateTime, vnTime, weekdayText
+  addDays, boardIncidents, Daily, DailyBoard as Board, dayText, dupTarget, exportDailyWord, ROLE_TEXT, Signer, totalsByField, unitName, vnDateTime, vnTime, weekdayText
 } from '../../services/dailyReportService';
 import { btnPrimary, btnSecondary, card, Chip, inputCls, labelCls, Sheet } from '../learning/common';
 import { IncidentView } from './DailyForm';
@@ -70,23 +70,23 @@ export const DailyBoardView: React.FC<Props> = ({ initialDay, deadline }) => {
         {day !== current && <button className={btnSecondary} onClick={() => setDay(current)}>Kỳ đang mở</button>}
         <button className={`${btnSecondary} px-3 ml-auto`} onClick={() => load(true)} aria-label="Làm mới"><RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} /></button>
       </div>
-      <div className="text-[13px] text-stone-500 mb-4">{weekdayText(day)}, {dayText(day)} · Kỳ báo cáo {periodText(day, deadline)}{day === current ? ' · đang mở' : ''}</div>
+      <div className="text-[13px] text-stone-500 mb-3">{weekdayText(day)}, {dayText(day)} · hạn {deadline}{day === current ? ' · đang mở' : ''}</div>
 
       {err && <div className="rounded-lg bg-red-50 text-red-800 px-4 py-3 text-sm">{err}</div>}
       {!b && !err && <div className="py-10 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-stone-400" /></div>}
       {b && (
         <>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 mb-4">
-            <Stat label="Đầu mối đã báo" value={`${reported}/${units.length}`} tone={reported === units.length ? 'text-emerald-700' : 'text-red-700'} />
+          <div className="grid grid-cols-4 gap-2 mb-3">
+            <Stat label="Đã báo" value={`${reported}/${units.length}`} tone={reported === units.length ? 'text-emerald-700' : 'text-red-700'} />
             <Stat label="Vụ việc" value={tot.cases} tone={tot.cases ? 'text-orange-700' : 'text-stone-900'} />
             <Stat label="Đối tượng" value={tot.suspects} />
             <Stat label="Nộp muộn" value={late} tone={late ? 'text-red-700' : 'text-stone-900'} />
           </div>
 
           {canManage && (
-            <div className="flex flex-wrap gap-2 mb-4">
-              {reported < units.length && <button className={btnSecondary} onClick={remind} data-testid="board-remind"><BellRing className="w-4 h-4" />Nhắc đầu mối chưa báo</button>}
-              <button className={btnPrimary} onClick={() => setSignOpen(true)} data-testid="board-word"><FileText className="w-4 h-4" />Xuất Word báo cáo ngày</button>
+            <div className="grid grid-cols-2 md:flex gap-2 mb-3">
+              <button className={btnPrimary} onClick={() => setSignOpen(true)} data-testid="board-word"><FileText className="w-4 h-4" />Xuất Word</button>
+              {reported < units.length && <button className={btnSecondary} onClick={remind} data-testid="board-remind"><BellRing className="w-4 h-4" />Nhắc chưa báo</button>}
             </div>
           )}
           {msg && <div className="mb-3 text-sm rounded-lg bg-stone-100 text-stone-800 px-3 py-2">{msg}</div>}
@@ -102,30 +102,23 @@ export const DailyBoardView: React.FC<Props> = ({ initialDay, deadline }) => {
             </div>
           )}
 
-          {/* 6 đầu mối */}
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-2.5 mb-5">
+          {/* 6 đầu mối: mỗi đầu mối 1 dòng */}
+          <div className={`${card} mb-4 divide-y divide-stone-100`}>
             {units.map(u => {
               const r = u.report;
-              const tone = !r ? 'border-l-red-500' : r.status === 'NORMAL' ? 'border-l-emerald-500' : 'border-l-orange-500';
+              const dot = !r ? 'bg-red-500' : r.status === 'NORMAL' ? 'bg-emerald-500' : 'bg-orange-500';
               return (
-                <div key={u.unit} className={`${card} border-l-4 ${tone} p-3`} data-testid="board-unit" data-unit={u.unit} data-status={r?.status || 'NONE'}>
-                  <div className="flex items-center gap-2">
-                    <div className="font-bold text-stone-900 flex-1">{u.unitName}</div>
-                    {!r ? <Chip tone="red">Chưa báo</Chip> : r.status === 'NORMAL' ? <Chip tone="green">Bình thường</Chip> : <Chip tone="orange">{r.incidents.length} vụ việc</Chip>}
+                <div key={u.unit} className="px-3 py-2.5 flex items-center gap-2.5" data-testid="board-unit" data-unit={u.unit} data-status={r?.status || 'NONE'}>
+                  <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${dot}`} />
+                  <div className="min-w-0 flex-1">
+                    <div className="font-semibold text-[15px] text-stone-900 leading-tight">{u.unitName}</div>
+                    <div className="text-[12px] text-stone-500 truncate">
+                      {r ? <>Đ/c {r.reporterName} · {vnTime(r.submittedAt)}{r.late && <span className="text-red-700 font-semibold"> · muộn</span>}</> : 'Chưa có ai báo cáo'}
+                      {u.flash.length > 0 && <span className="text-red-700 font-semibold"> · {u.flash.length} báo nhanh</span>}
+                    </div>
                   </div>
-                  {r ? (
-                    <div className="text-[13px] text-stone-600 mt-1">
-                      Đ/c {r.reporterName} · {vnTime(r.submittedAt)}{r.late && <span className="text-red-700 font-semibold"> · muộn</span>}
-                      {u.versions > 1 && <button className="ml-1 text-brand-700 font-semibold" onClick={() => setHist(u.unit)}>· {u.versions} phiên bản</button>}
-                      {r.note && <div className="text-stone-500 mt-0.5 line-clamp-2">{r.note}</div>}
-                    </div>
-                  ) : (
-                    <div className="text-[13px] text-stone-600 mt-1">
-                      <span className="text-red-700">Chưa có ai báo cáo</span>
-                    </div>
-                  )}
-                  {u.flash.length > 0 && <div className="mt-1"><Chip tone="red">{u.flash.length} báo cáo nhanh</Chip></div>}
-                  {u.versions === 1 && r && <button className="mt-1 text-[12px] text-stone-500 inline-flex items-center gap-1" onClick={() => setHist(u.unit)}><History className="w-3.5 h-3.5" />Lịch sử</button>}
+                  {!r ? <Chip tone="red">Chưa báo</Chip> : r.status === 'NORMAL' ? <Chip tone="green">Bình thường</Chip> : <Chip tone="orange">{r.incidents.length} vụ việc</Chip>}
+                  {r && <button className="p-1.5 -mr-1 rounded-lg text-stone-400 hover:bg-stone-100" onClick={() => setHist(u.unit)} aria-label="Lịch sử"><History className="w-4 h-4" /></button>}
                 </div>
               );
             })}
@@ -169,9 +162,9 @@ export const DailyBoardView: React.FC<Props> = ({ initialDay, deadline }) => {
 };
 
 const Stat: React.FC<{ label: string; value: React.ReactNode; tone?: string }> = ({ label, value, tone = 'text-stone-900' }) => (
-  <div className={`${card} p-3`}>
-    <div className="text-[12px] text-stone-500">{label}</div>
-    <div className={`text-2xl font-bold tabular ${tone}`}>{value}</div>
+  <div className={`${card} px-2 py-2 md:p-3 text-center md:text-left`}>
+    <div className="text-[11px] md:text-[12px] text-stone-500 whitespace-nowrap">{label}</div>
+    <div className={`text-xl md:text-2xl font-bold tabular ${tone}`}>{value}</div>
   </div>
 );
 
