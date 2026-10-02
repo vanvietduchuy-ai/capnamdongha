@@ -233,8 +233,12 @@ export const MockDB = {
           'postgres_changes',
           { event: '*', schema: 'public', table: 'seating_layouts' },
           () => { subscriptions.forEach(cb => cb('attendance_seating_layouts')); }
-        )
-        .subscribe();
+        );
+      // Học tập & Thi (08_hoc_tap_thi.sql)
+      ['learn_courses', 'learn_lessons', 'learn_progress', 'exams', 'exam_events'].forEach(t => {
+        channel.on('postgres_changes', { event: '*', schema: 'public', table: t }, () => { subscriptions.forEach(cb => cb(t)); });
+      });
+      channel.subscribe();
 
       return true;
     } catch (error) {
@@ -300,7 +304,12 @@ export const MockDB = {
      if (seat.error || flag.error) {
        return { ok: false, message: 'Chưa cài sơ đồ chỗ ngồi. Hãy chạy file supabase/07_so_do_cho_ngoi.sql.' };
      }
-     return { ok: true, message: 'Cơ sở dữ liệu đã đầy đủ bảng và hàm nghiệp vụ (01–07).' };
+     const learn = await client.from('learn_courses').select('id').limit(1);
+     const exam = await client.rpc('app_exam_my', { p_token: 'kiem-tra-cai-dat-000000000000' });
+     if (learn.error || exam.error) {
+       return { ok: false, message: 'Chưa cài Học tập & Thi. Hãy chạy file supabase/08_hoc_tap_thi.sql.' };
+     }
+     return { ok: true, message: 'Cơ sở dữ liệu đã đầy đủ bảng và hàm nghiệp vụ (01–08).' };
   },
 
   subscribe: (callback: (table?: string) => void) => {
