@@ -165,7 +165,7 @@ export const Daily = {
 };
 
 const cleanIncident = (i: DailyIncident) => ({
-  key: i.key, kind: i.kind || '', suspectInfo: (i.suspectInfo || '').trim(), field: i.field, severity: i.severity || '', occurredAt: (i.occurredAt || '').trim(), location: (i.location || '').trim(),
+  key: i.key, kind: i.kind || '', suspectInfo: (i.suspectInfo || '').trim(), field: i.field || 'Khác', severity: i.severity || '', occurredAt: (i.occurredAt || '').trim(), location: (i.location || '').trim(),
   summary: (i.summary || '').trim(), cases: Math.max(1, Number(i.cases) || 1), suspects: Math.max(0, Number(i.suspects) || 0),
   victims: Math.max(0, Number(i.victims) || 0), damage: (i.damage || '').trim(), handling: i.handling || '',
   handlingNote: (i.handlingNote || '').trim(), dupOf: i.dupOf || ''
@@ -173,8 +173,6 @@ const cleanIncident = (i: DailyIncident) => ({
 
 /** Kiểm tra trên máy trước khi gửi (máy chủ kiểm tra lại) */
 export const incidentError = (i: DailyIncident): string | null => {
-  if (!i.kind) return 'Chưa chọn loại (hình sự / hành chính).';
-  if (!i.field) return 'Chưa chọn lĩnh vực.';
   if ((i.summary || '').trim().length < 5) return 'Chưa nhập nội dung vụ việc.';
   if (!(Number(i.cases) >= 1)) return 'Số vụ việc phải từ 1 trở lên.';
   if ([i.summary, i.location, i.damage, i.handlingNote, i.occurredAt, i.suspectInfo].some(looksLikeId))
@@ -190,7 +188,21 @@ const NUM_WORD: Record<string, number> = { 'một': 1, 'hai': 2, 'ba': 3, 'bốn
 const NAME = String.raw`\p{Lu}\p{Ll}*(?:\s+\p{Lu}\p{Ll}*){1,4}`;
 const ADDR_KEY = String.raw`(?:trú|thường trú|tạm trú|HKTT|nơi ở|địa chỉ|ở)`;
 
-export interface ParsedIncident { suspects: number; suspectInfo: string; occurredAt: string; location: string; }
+export interface ParsedIncident { suspects: number; suspectInfo: string; occurredAt: string; location: string; kind: string; field: string; }
+
+/** Đoán lĩnh vực theo từ khoá (thứ tự ưu tiên từ trên xuống) */
+const FIELD_KEYS: [string, RegExp][] = [
+  ['Ma tuý', /ma t[uú][yý]|heroin|methamphetamin|ketamin|thu[ốo]c l[ắa]c|c[ầa]n sa|ch[ấa]t c[ấa]m|m[ạa] t[úu]y/],
+  ['Cháy, nổ, cứu nạn, cứu hộ', /ch[áa]y|(?:^|\s)n[ổ](?=[\s,.;]|$)|ph[áa]t n[ổo]|c[ứu]u n[ạa]n|c[ứu]u h[ộo]/],
+  ['Trật tự an toàn giao thông', /giao th[ôo]ng|tngt|va ch[ạa]m|n[ồo]ng [đd][ộo] c[ồo]n|[đd]ua xe|l[ạa]ng l[áa]ch|kh[ôo]ng [đd][ộo]i m[ũu]/],
+  ['Tai nạn, sự cố, chết người bất thường', /t[ửu] vong|ch[ếe]t ng[ưu][ờo]i|[đd]u[ốo]i n[ưu][ớo]c|[đd]i[ệe]n gi[ậa]t|tai n[ạa]n lao [đd][ộo]ng|s[ựu] c[ốo]/],
+  ['Khiếu kiện, tập trung đông người', /khi[ếe]u ki[ệe]n|khi[ếe]u n[ạa]i|t[ậa]p trung [đd][ôo]ng ng[ưu][ờo]i|t[ụu] t[ậa]p [đd][ôo]ng/],
+  ['An ninh, chính trị nội bộ, tôn giáo', /t[ôo]n gi[áa]o|ph[ảa]n [đd][ộo]ng|ch[íi]nh tr[ịi]|tuy[êe]n truy[ềe]n|bi[ểe]u t[ìi]nh|ng[ưu][ờo]i n[ưu][ớo]c ngo[àa]i|an ninh/],
+  ['Kinh tế, chức vụ, môi trường', /h[àa]ng gi[ảa]|bu[ôo]n l[ậa]u|m[ôo]i tr[ưu][ờo]ng|tham [ôo]|gian l[ậa]n th[ưu][ơo]ng m[ạa]i|h[àa]ng c[ấa]m|kinh t[ếe]|thu[ếe]/],
+  ['Trật tự xã hội, tệ nạn xã hội', /g[âa]y r[ốo]i|[đd][áa]nh nhau|[ẩa]u [đd][ảa]|c[ờo] b[ạa]c|[đd][áa]nh b[ạa]c|l[ôo] [đd][ềe]|m[ạa]i d[âa]m|karaoke|say r[ưu][ợo]u|t[ệe] n[ạa]n|x[ôo] x[áa]t|c[ãa]i nhau|m[ấa]t tr[ậa]t t[ựu]/],
+  ['Hình sự', /tr[ộo]m|c[ưu][ớo]p|l[ừu]a [đd][ảa]o|g[âa]y th[ưu][ơo]ng t[íi]ch|gi[ếe]t|chi[ếe]m [đd]o[ạa]t|c[ưu][ỡo]ng [đd]o[ạa]t|hi[ếe]p|kh[ởo]i t[ốo]|b[ắa]t qu[ảa] tang|truy n[ãa]/],
+  ['Tin báo, tố giác tội phạm', /tin b[áa]o|t[ốo] gi[áa]c/]
+];
 
 /** Đọc nội dung vụ việc: số đối tượng, họ tên – năm sinh – nơi ở của đối tượng, thời gian, địa điểm (người dùng sửa lại được) */
 export const parseIncidentText = (text: string): ParsedIncident => {
@@ -238,7 +250,11 @@ export const parseIncidentText = (text: string): ParsedIncident => {
   // Địa điểm: "tại TDP 3", "tại quán ..."
   const lm = t.match(/\btại\s+((?:TDP|tổ dân phố|khu phố|KP|đường|số nhà|số|thôn|kiệt|ngõ|hẻm|quán|nhà|chợ|trường|khu vực|khu|cửa hàng|siêu thị|chung cư|ngã tư|ngã ba)[^,.;\n]{0,60})/iu);
   const location = lm ? lm[1].trim() : '';
-  return { suspects, suspectInfo, occurredAt, location };
+  const low = t.toLowerCase();
+  const field = FIELD_KEYS.find(([, re]) => re.test(low))?.[0] || '';
+  const kind = /h[àa]nh ch[íi]nh|x[ửu] ph[ạa]t|bi[êe]n b[ảa]n vi ph[ạa]m|nh[ắa]c nh[ởo]|gi[áa]o d[ụu]c|cam k[ếe]t|t[ạa]m gi[ữu] ph[ưu][ơo]ng ti[ệe]n/.test(low) ? 'Hành chính'
+    : (field === 'Hình sự' || field === 'Ma tuý' || /kh[ởo]i t[ốo]|t[ộo]i|h[ìi]nh s[ựu]/.test(low)) ? 'Hình sự' : '';
+  return { suspects, suspectInfo, occurredAt, location, kind, field };
 };
 
 /* ============================ TỔNG HỢP ============================ */
