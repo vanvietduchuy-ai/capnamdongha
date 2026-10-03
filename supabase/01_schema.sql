@@ -229,65 +229,7 @@ BEGIN
 END
 $$;
 
--- 15. BẢNG MAP_ZONES (Sơ đồ bảo vệ - Các vùng/chốt)
-CREATE TABLE IF NOT EXISTS map_zones (id text PRIMARY KEY);
-ALTER TABLE map_zones ADD COLUMN IF NOT EXISTS type text; -- 'Polygon', 'Rectangle', 'Polyline', 'Label'
-ALTER TABLE map_zones ADD COLUMN IF NOT EXISTS positions jsonb; -- Coordinates
-ALTER TABLE map_zones ADD COLUMN IF NOT EXISTS label text;
-ALTER TABLE map_zones ADD COLUMN IF NOT EXISTS description text;
-ALTER TABLE map_zones ADD COLUMN IF NOT EXISTS "assignedUserIds" jsonb; -- Array of user IDs
-ALTER TABLE map_zones ADD COLUMN IF NOT EXISTS color text;
-ALTER TABLE map_zones ADD COLUMN IF NOT EXISTS "fillColor" text;
-ALTER TABLE map_zones ADD COLUMN IF NOT EXISTS "textColor" text;
-ALTER TABLE map_zones ADD COLUMN IF NOT EXISTS "dutyId" text; -- Link to specific duty
-ALTER TABLE map_zones ADD COLUMN IF NOT EXISTS "createdAt" bigint;
-ALTER TABLE map_zones ADD COLUMN IF NOT EXISTS "updatedAt" bigint;
-ALTER TABLE map_zones REPLICA IDENTITY FULL;
-
--- 16. BẢNG DUTY_INFO (Thông tin đợt bảo vệ)
-CREATE TABLE IF NOT EXISTS duty_info (id text PRIMARY KEY);
-ALTER TABLE duty_info ADD COLUMN IF NOT EXISTS title text;
-ALTER TABLE duty_info ADD COLUMN IF NOT EXISTS "startTime" text;
-ALTER TABLE duty_info ADD COLUMN IF NOT EXISTS "endTime" text;
-ALTER TABLE duty_info ADD COLUMN IF NOT EXISTS "isActive" boolean DEFAULT true;
-ALTER TABLE duty_info ADD COLUMN IF NOT EXISTS "mapType" text DEFAULT 'real';
-ALTER TABLE duty_info ADD COLUMN IF NOT EXISTS "mapImageUrl" text;
-ALTER TABLE duty_info ADD COLUMN IF NOT EXISTS "imageWidth" int;
-ALTER TABLE duty_info ADD COLUMN IF NOT EXISTS "imageHeight" int;
-ALTER TABLE duty_info ADD COLUMN IF NOT EXISTS "createdAt" bigint;
-ALTER TABLE duty_info ADD COLUMN IF NOT EXISTS "updatedAt" bigint;
-ALTER TABLE duty_info REPLICA IDENTITY FULL;
-
--- 17. KÍCH HOẠT REALTIME CHO MAP
-DO $$
-DECLARE t text;
-BEGIN
-  FOREACH t IN ARRAY ARRAY['map_zones','duty_info']
-  LOOP
-    IF EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime')
-       AND NOT EXISTS (SELECT 1 FROM pg_publication_tables
-                       WHERE pubname = 'supabase_realtime' AND schemaname = 'public' AND tablename = t) THEN
-      EXECUTE format('ALTER PUBLICATION supabase_realtime ADD TABLE public.%I', t);
-    END IF;
-  END LOOP;
-END
-$$;
-
--- 18. CHÍNH SÁCH BẢO MẬT CHO MAP
-ALTER TABLE map_zones ENABLE ROW LEVEL SECURITY;
-ALTER TABLE duty_info ENABLE ROW LEVEL SECURITY;
-
-DO $$
-BEGIN
-    IF NOT EXISTS (SELECT 1 FROM pg_policy WHERE polname = 'Public Access Map Zones') THEN
-        CREATE POLICY "Public Access Map Zones" ON map_zones FOR ALL USING (true);
-    END IF;
-    
-    IF NOT EXISTS (SELECT 1 FROM pg_policy WHERE polname = 'Public Access Duty Info') THEN
-        CREATE POLICY "Public Access Duty Info" ON duty_info FOR ALL USING (true);
-    END IF;
-END
-$$;
+-- 15–18. (Đã bỏ chức năng Sơ đồ bảo vệ — bảng map_zones, duty_info xoá bằng file 10_xoa_so_do_bao_ve.sql)
 
 -- 19. BẢNG USER_GROUPS (Nhóm tuỳ chọn)
 CREATE TABLE IF NOT EXISTS user_groups (id text PRIMARY KEY);
