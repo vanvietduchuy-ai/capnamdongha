@@ -1,18 +1,16 @@
 /**
  * Cố định màn hình trên điện thoại (nhất là iPhone/Safari, vốn bỏ qua user-scalable=no):
- * - chặn phóng to bằng 2 ngón ngoài bản đồ (bản đồ Leaflet vẫn phóng to được);
+ * - chặn phóng to bằng 2 ngón;
  * - không cho trang bị trượt ngang (nếu lỡ lệch thì tự kéo về sát lề trái).
  */
-const inMap = (t: EventTarget | null) => t instanceof Element && !!t.closest('.leaflet-container');
-
 if (typeof window !== 'undefined' && typeof document !== 'undefined') {
   // Safari: cử chỉ phóng to
   (['gesturestart', 'gesturechange', 'gestureend'] as const).forEach(ev =>
-    document.addEventListener(ev, e => { if (!inMap(e.target)) e.preventDefault(); }, { passive: false }));
+    document.addEventListener(ev, e => e.preventDefault(), { passive: false }));
 
-  // Chạm 2 ngón kéo/phóng to ngoài bản đồ
+  // Chạm 2 ngón kéo/phóng to
   document.addEventListener('touchmove', (e: TouchEvent) => {
-    if (e.touches.length > 1 && !inMap(e.target)) e.preventDefault();
+    if (e.touches.length > 1) e.preventDefault();
   }, { passive: false });
 
   // Trang không bao giờ lệch ngang

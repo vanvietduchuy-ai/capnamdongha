@@ -2,7 +2,7 @@
  * KẾT NỐI SUPABASE
  * Cấu hình (URL + anon key) lưu trong trình duyệt nên đổi là có hiệu lực ngay,
  * không cần build lại. Biến `supabase` là proxy: các màn hình cũ
- * (Sơ đồ bảo vệ – MapDuty...) import và dùng như bình thường.
+ * import và dùng như bình thường.
  */
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
