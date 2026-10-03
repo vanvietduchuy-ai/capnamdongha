@@ -156,7 +156,7 @@ export const MockDB = {
       if (!config || !config.supabaseUrl || !config.supabaseKey) return false;
       if (supabase) return true;
 
-      // Dùng chung một client với các màn hình khác (Sơ đồ bảo vệ...)
+      // Dùng chung một client với các màn hình khác
       supabase = setClientConfig(config);
       console.log('Đã kết nối Supabase');
       
