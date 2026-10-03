@@ -20,12 +20,11 @@ import { LOGO_URL, ORG_PARENT, ORG_NAME } from './lib/brand';
 import { InstallSheet, InstallBanner, InAppNotice, InstallPage, useInstallEnv } from './components/InstallGuide';
 import { INSTALL_PATH } from './lib/install';
 import {
-  Home, ClipboardList, QrCode, CalendarDays, Map as MapIcon, LayoutGrid, Inbox, Users, Download,
+  Home, ClipboardList, QrCode, CalendarDays, LayoutGrid, Inbox, Users, Download,
   KeyRound, LogOut, RefreshCw, Bell, BellOff, Menu, X, ChevronRight, Settings2, Plus, FileSpreadsheet,
   ImageDown, AlertTriangle, Clock, CheckCircle2, Link2, Repeat, Pencil, MessageSquareQuote, FolderOpen, Zap, GraduationCap, ClipboardCheck
 } from 'lucide-react';
 
-const MapDuty = lazy(() => import('./components/MapDuty/MapDuty').then(module => ({ default: module.MapDuty })));
 
 const LoadingBox: React.FC = () => <SkeletonList rows={3} className="max-w-3xl" />;
 
@@ -110,14 +109,12 @@ const hasPermission = (user: User | null, permission: UserPermission): boolean =
     case UserPermission.MANAGE_DAILY_REPORT:
       return user.role === UserRole.CHIEF || user.role === UserRole.DEPUTY_CHIEF
         || (user.department === UserDepartment.TONG_HOP && (user.role === UserRole.MANAGER || user.role === UserRole.DEPUTY));
-    case UserPermission.MANAGE_MAP_DUTY:
-      return false; // Only Admin by default as requested
     default:
       return false;
   }
 };
 
-type ViewState = 'HOME' | 'DASHBOARD' | 'PROPOSALS' | 'CALENDAR' | 'UTILITIES' | 'ATTENDANCE' | 'MAP_DUTY' | 'LEARNING' | 'DAILY';
+type ViewState = 'HOME' | 'DASHBOARD' | 'PROPOSALS' | 'CALENDAR' | 'UTILITIES' | 'ATTENDANCE' | 'LEARNING' | 'DAILY';
 
 // Updated Default Utilities - Empty as requested
 const DEFAULT_UTILITIES: Utility[] = [];
@@ -145,7 +142,7 @@ const ToastNotification: React.FC<{ title: string; message: string; type?: strin
 
 /** Màu khối biểu tượng của từng module (kiểu khối 3D) */
 const MODULE_COLOR: Record<string, string> = {
-  HOME: '#475569', DASHBOARD: '#c1121f', ATTENDANCE: '#0f766e', CALENDAR: '#1d4ed8', MAP_DUTY: '#b45309',
+  HOME: '#475569', DASHBOARD: '#c1121f', ATTENDANCE: '#0f766e', CALENDAR: '#1d4ed8',
   UTILITIES: '#6d28d9', PROPOSALS: '#0369a1', USERS: '#374151', INSTALL: '#15803d', LEARNING: '#7c2d12', DAILY: '#9f1239'
 };
 
@@ -156,7 +153,6 @@ const VIEW_META: Record<string, { title: string; subtitle: string }> = {
   CALENDAR: { title: 'Lịch cá nhân', subtitle: 'Lịch làm việc, lịch trực và sự kiện' },
   UTILITIES: { title: 'Tiện ích', subtitle: 'Công cụ và liên kết hỗ trợ nghiệp vụ' },
   ATTENDANCE: { title: 'Điểm danh hội nghị', subtitle: 'Tạo hội nghị, điểm danh bằng mã QR và báo cáo vắng mặt' },
-  MAP_DUTY: { title: 'Sơ đồ bảo vệ', subtitle: 'Phân công và theo dõi vị trí các chốt' },
   LEARNING: { title: 'Học tập & Thi', subtitle: 'Khoá học, bài học, thi trắc nghiệm có chống gian lận' },
   DAILY: { title: 'Báo cáo ngày', subtitle: 'Tình hình an ninh, trật tự hằng ngày của các tổ và trực ban' }
 };
@@ -245,7 +241,7 @@ const App: React.FC = () => {
 
   // LOGIC: Sidebar only visible in Task Book Module AND Calendar Module AND Utilities
   // Include UTILITIES here so it gets the standard header with Refresh button
-  const isTaskView = ['DASHBOARD', 'PROPOSALS', 'CALENDAR', 'UTILITIES', 'MAP_DUTY'].includes(currentView);
+  const isTaskView = ['DASHBOARD', 'PROPOSALS', 'CALENDAR', 'UTILITIES'].includes(currentView);
 
   // Buộc đăng xuất (phiên hết hạn, tài khoản bị xoá/khoá)
   const forceLogout = (message?: string) => {
@@ -1250,7 +1246,6 @@ const App: React.FC = () => {
       { c: MODULE_COLOR.DAILY, short: 'Báo cáo ngày', label: 'Báo cáo ngày', desc: 'Báo cáo tình hình ANTT hằng ngày, theo dõi, tổng hợp', icon: ClipboardCheck, onClick: () => goTo('DAILY') },
       { c: MODULE_COLOR.LEARNING, short: 'Học tập & Thi', label: 'Học tập & Thi', desc: 'Học bài theo khoá, thi trắc nghiệm trực tuyến', icon: GraduationCap, onClick: () => goTo('LEARNING') },
       { c: MODULE_COLOR.CALENDAR, label: 'Lịch cá nhân', desc: 'Lịch trực, lịch họp và sự kiện quan trọng', icon: CalendarDays, onClick: () => goTo('CALENDAR') },
-      { c: MODULE_COLOR.MAP_DUTY, label: 'Sơ đồ bảo vệ', desc: 'Phân công, theo dõi vị trí các chốt trên bản đồ', icon: MapIcon, onClick: () => goTo('MAP_DUTY') },
       { c: MODULE_COLOR.UTILITIES, label: 'Tiện ích', desc: 'Tra cứu văn bản, danh bạ và công cụ hỗ trợ', icon: LayoutGrid, onClick: () => goTo('UTILITIES') },
       { c: MODULE_COLOR.USERS, label: 'Quản lý cán bộ', desc: 'Danh sách, chức vụ, phân quyền tài khoản', icon: Users, onClick: () => setShowUserModal(true), show: isLeader(currentUser?.role || UserRole.OFFICER) }
     ];
@@ -1405,7 +1400,6 @@ const App: React.FC = () => {
     { v: 'DAILY', label: 'Báo cáo ngày', icon: ClipboardCheck, badge: dailyPending || undefined },
     { v: 'LEARNING', label: 'Học tập & Thi', icon: GraduationCap },
     { v: 'CALENDAR', label: 'Lịch cá nhân', icon: CalendarDays },
-    { v: 'MAP_DUTY', label: 'Sơ đồ bảo vệ', icon: MapIcon },
     { v: 'UTILITIES', label: 'Tiện ích', icon: LayoutGrid },
     { v: 'PROPOSALS', label: 'Hòm thư đề xuất', icon: Inbox, show: isLeader(currentUser.role), badge: proposalTasks.length || undefined }
   ];
@@ -1603,7 +1597,7 @@ const App: React.FC = () => {
           </div>
         </header>
 
-        <div key={currentView} className={`view-enter mx-auto max-w-[1400px] px-3 md:px-8 pt-4 md:pt-6 ${currentView === 'MAP_DUTY' ? 'pb-24 md:pb-6' : 'pb-28 md:pb-12'}`}>
+        <div key={currentView} className={`view-enter mx-auto max-w-[1400px] px-3 md:px-8 pt-4 md:pt-6 pb-28 md:pb-12`}>
 
         {currentView === 'DASHBOARD' && (
           <div className="flex flex-wrap items-center justify-end gap-2 mb-4">
@@ -1690,8 +1684,6 @@ const App: React.FC = () => {
               onOpened={() => { setDailyOpen(null); try { sessionStorage.removeItem('dailyOpen'); } catch { /* bỏ qua */ } }} /></Suspense>
         ) : currentView === 'LEARNING' ? (
             <Suspense fallback={<LoadingBox />}><LearningHub currentUser={currentUser!} canManage={hasPermission(currentUser, UserPermission.MANAGE_LEARNING)} /></Suspense>
-        ) : currentView === 'MAP_DUTY' ? (
-            <Suspense fallback={<LoadingBox />}><MapDuty currentUser={currentUser!} users={users} isLeader={hasPermission(currentUser, UserPermission.MANAGE_MAP_DUTY)} /></Suspense>
         ) : (
            <>
               {recurringAlerts.length > 0 && (
@@ -1823,7 +1815,7 @@ const App: React.FC = () => {
         style={{ paddingBottom: 'env(safe-area-inset-bottom)' }} aria-label="Điều hướng chính">
         {([
           { v: 'HOME', label: 'Trang chủ', icon: Home },
-          { v: 'DASHBOARD', label: 'Công việc', icon: ClipboardList },
+          { v: 'LEARNING', label: 'Học tập', icon: GraduationCap },
           { v: 'ATTENDANCE', label: 'Điểm danh', icon: QrCode },
           { v: 'CALENDAR', label: 'Lịch', icon: CalendarDays }
         ] as { v: ViewState; label: string; icon: React.ElementType }[]).map(({ v, label, icon: Icon }) => {
@@ -1839,8 +1831,8 @@ const App: React.FC = () => {
             </button>
           );
         })}
-        <button onClick={() => setIsMobileMenuOpen(true)} className={`h-16 flex flex-col items-center justify-center gap-1 text-[11px] ${['MAP_DUTY', 'UTILITIES', 'PROPOSALS', 'LEARNING', 'DAILY'].includes(currentView) ? 'text-brand-700 font-semibold' : 'text-stone-500'}`}>
-          <Menu className="w-[22px] h-[22px]" strokeWidth={1.8} />Thêm
+        <button onClick={() => setIsMobileMenuOpen(true)} className={`h-16 flex flex-col items-center justify-center gap-1 text-[11px] ${['DASHBOARD', 'UTILITIES', 'PROPOSALS', 'DAILY'].includes(currentView) ? 'text-brand-700 font-semibold' : 'text-stone-500'}`}>
+          <span className="relative"><Menu className="w-[22px] h-[22px]" strokeWidth={1.8} />{stats.overdue > 0 && <span className="absolute -top-1 -right-1.5 w-2 h-2 rounded-full bg-red-600 ring-2 ring-white"></span>}</span>Thêm
         </button>
       </nav>
 

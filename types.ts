@@ -50,7 +50,6 @@ export enum UserPermission {
   MANAGE_TASKS = 'MANAGE_TASKS', // Quản lý toàn bộ nhiệm vụ
   VIEW_ALL_TASKS = 'VIEW_ALL_TASKS', // Xem toàn bộ nhiệm vụ
   MANAGE_PROPOSALS = 'MANAGE_PROPOSALS', // Quản lý đề xuất
-  MANAGE_MAP_DUTY = 'MANAGE_MAP_DUTY', // Quản lý sơ đồ bảo vệ
   MANAGE_LEARNING = 'MANAGE_LEARNING', // Soạn bài, ngân hàng câu hỏi, tổ chức thi
   MANAGE_DAILY_REPORT = 'MANAGE_DAILY_REPORT' // Theo dõi, tổng hợp, phân công báo cáo ngày
 }
