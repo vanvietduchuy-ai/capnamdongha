@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { AlertTriangle, CheckCircle2, ClipboardCheck, CloudOff, Loader2, Shield, Siren, Users } from 'lucide-react';
 import { DailyMine, DailyUnit, User, UserRole } from '../../types';
-import { Daily, DailyMe, dayShort, UNITS, vnTime } from '../../services/dailyReportService';
+import { addDays, Daily, DailyMe, dayShort, UNITS, vnDateTime, vnTime } from '../../services/dailyReportService';
 import { card, Empty } from '../learning/common';
 import { DailyForm } from './DailyForm';
 import { DailyBoardView } from './DailyBoard';
@@ -72,7 +72,8 @@ export const DailyHub: React.FC<Props> = ({ currentUser, openUnit, onOpened }) =
     ...(canManage ? [['STATS', 'Tổng hợp'] as [Tab, string], ['SETUP', 'Mã QR'] as [Tab, string]] : [])];
   const active = tabs.some(t => t[0] === tab) ? tab : 'MINE';
   const mine = me.mine || [];
-  const current = mine.filter(m => !m.overdue);
+  const current = mine.filter(m => !m.overdue && !m.prev);
+  const prevDone = mine.filter(m => m.prev);
   const overdue = mine.filter(m => m.overdue);
   const pending = current.filter(m => m.own && !m.reported).length;
   const open = (m: DailyMine) => {
@@ -80,6 +81,25 @@ export const DailyHub: React.FC<Props> = ({ currentUser, openUnit, onOpened }) =
     setForm({ unit: m.unit, day: m.day, reported: !!m.reported });
   };
   const past = (me.deadlineAt || 0) > 0 && Date.now() + offset > (me.deadlineAt || 0);
+  // Mốc mở kỳ: trước giờ mở, kỳ mới chưa nhận báo cáo → báo cáo trễ phải nộp vào kỳ vừa đóng
+  const notOpen = !!me.openAt && Date.now() + offset < me.openAt;
+  const prevDay = me.currentDay ? addDays(me.currentDay, -1) : '';
+  const overdueBlock = (overdue.length > 0 || prevDone.length > 0) && (
+    <div className={notOpen ? 'mb-5' : 'mt-5'} data-testid="daily-overdue">
+      <div className="font-bold text-[15px] text-stone-900 mb-2">{notOpen ? `Kỳ ngày ${dayShort(prevDay)} (vừa chốt)` : 'Nộp bù kỳ trước'}
+        {overdue.length > 0 && <span className="font-normal text-red-700"> · nộp bù ghi muộn</span>}</div>
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-2.5">
+        {prevDone.map(m => <RoleCard key={'p' + m.unit} m={m} last={false} onClick={() => open(m)} />)}
+        {overdue.map(m => (
+          <button key={m.unit + m.day} onClick={() => open(m)} data-testid="daily-overdue-item" data-unit={m.unit}
+            className={`${card} w-full text-left p-3 border-red-300 bg-red-50/60`}>
+            <div className="font-semibold text-[15px] text-stone-900 leading-tight">{m.unitName}</div>
+            <div className="text-[12px] text-red-700 mt-0.5 inline-flex items-center gap-1"><AlertTriangle className="w-3.5 h-3.5" />Ngày {dayShort(m.day)} chưa báo</div>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
 
   return (
     <div data-testid="daily-hub">
@@ -105,36 +125,32 @@ export const DailyHub: React.FC<Props> = ({ currentUser, openUnit, onOpened }) =
                   : 'Đồng chí báo Tổ Tổng hợp cập nhật máy chủ.'}
               </div>
             )}
+            {notOpen && (
+              <div className="mb-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 px-4 py-3 text-[14px] leading-snug" data-testid="daily-not-open">
+                <b>Kỳ báo cáo ngày {dayShort(me.currentDay!)} chưa mở.</b> Nhận báo cáo từ <b>{vnDateTime(me.openAt!)}</b> đến <b>{vnDateTime(me.deadlineAt!)}</b>.
+                {' '}Kỳ ngày {dayShort(prevDay)} đã chốt lúc {deadline}{overdue.length ? <> — đầu mối nào chưa báo thì chọn <b>Nộp bù</b> bên dưới.</> : '.'}
+                {' '}Vụ việc nghiêm trọng xảy ra lúc này: mở đầu mối, dùng <b>Báo cáo nhanh</b>.
+              </div>
+            )}
+            {notOpen && overdueBlock}
             <div className="flex items-baseline justify-between gap-2 mb-2.5">
-              <div className="font-bold text-[17px] text-stone-900">Chọn đầu mối báo cáo</div>
-              <div className={`text-[13px] whitespace-nowrap ${past ? 'text-red-700 font-semibold' : 'text-stone-500'}`}>Ngày {dayShort(me.currentDay!)} · hạn {deadline}</div>
+              <div className="font-bold text-[17px] text-stone-900">{notOpen ? 'Kỳ tiếp theo' : 'Chọn đầu mối báo cáo'}</div>
+              <div className={`text-[13px] whitespace-nowrap ${past ? 'text-red-700 font-semibold' : 'text-stone-500'}`}>
+                Ngày {dayShort(me.currentDay!)} · {notOpen ? `mở ${me.open || ''}` : `hạn ${deadline}`}</div>
             </div>
             {current.length === 0 ? (
               <Empty icon={ClipboardCheck} title="Tài khoản này không báo cáo ngày" text={currentUser.role === UserRole.ADMIN ? 'Tài khoản quản trị chỉ theo dõi.' : 'Liên hệ Tổ Tổng hợp để được kiểm tra tài khoản.'} />
             ) : (
               <div className="grid grid-cols-2 lg:grid-cols-3 gap-2.5">
-                {current.map(m => <RoleCard key={m.unit} m={m} last={m.unit === lastUnit} onClick={() => open(m)} />)}
+                {current.map(m => <RoleCard key={m.unit} m={m} last={m.unit === lastUnit} notOpen={notOpen} openLabel={me.open} onClick={() => open(m)} />)}
               </div>
             )}
-            {overdue.length > 0 && (
-              <div className="mt-5">
-                <div className="font-bold text-[15px] text-stone-900 mb-2">Nộp bù kỳ trước</div>
-                <div className="grid grid-cols-2 lg:grid-cols-3 gap-2.5">
-                  {overdue.map(m => (
-                    <button key={m.unit + m.day} onClick={() => open(m)} data-testid="daily-overdue-item" data-unit={m.unit}
-                      className={`${card} w-full text-left p-3 border-red-300 bg-red-50/60`}>
-                      <div className="font-semibold text-[15px] text-stone-900 leading-tight">{m.unitName}</div>
-                      <div className="text-[12px] text-red-700 mt-0.5 inline-flex items-center gap-1"><AlertTriangle className="w-3.5 h-3.5" />Ngày {dayShort(m.day)} chưa báo</div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
+            {!notOpen && overdueBlock}
           </div>
         )}
         {active === 'BOARD' && <DailyBoardView initialDay={me.currentDay!} deadline={deadline} />}
         {active === 'STATS' && <DailyStats currentDay={me.currentDay!} />}
-        {active === 'SETUP' && <DailySettings me={currentUser} deadline={deadline} onDeadlineChanged={load} />}
+        {active === 'SETUP' && <DailySettings me={currentUser} deadline={deadline} open={me.open} onDeadlineChanged={load} />}
       </div>
     </div>
   );
@@ -143,11 +159,11 @@ export const DailyHub: React.FC<Props> = ({ currentUser, openUnit, onOpened }) =
 const isTo = (u: DailyUnit) => !!UNITS.find(x => x.id === u)?.dept;
 
 /** Thẻ chọn vai trò (2 cột trên điện thoại): tên đầu mối + đã có ai báo chưa */
-const RoleCard: React.FC<{ m: DailyMine; last: boolean; onClick: () => void }> = ({ m, last, onClick }) => {
+const RoleCard: React.FC<{ m: DailyMine; last: boolean; notOpen?: boolean; openLabel?: string; onClick: () => void }> = ({ m, last, notOpen, openLabel, onClick }) => {
   const Icon = isTo(m.unit) ? Users : m.unit === 'TBHS' ? Siren : Shield;
   return (
     <button onClick={onClick} data-testid="daily-role" data-unit={m.unit}
-      className={`${card} w-full text-left p-3 min-h-[96px] flex flex-col gap-2 ${(m.own || last) && !m.reported ? 'ring-2 ring-brand-700/50' : ''} ${m.reported ? 'bg-emerald-50/40' : ''}`}>
+      className={`${card} w-full text-left p-3 min-h-[96px] flex flex-col gap-2 ${(m.own || last) && !m.reported && !notOpen ? 'ring-2 ring-brand-700/50' : ''} ${m.reported ? 'bg-emerald-50/40' : ''} ${notOpen && !m.reported ? 'opacity-70' : ''}`}>
       <div className="flex items-center gap-2">
         <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${m.reported ? 'bg-emerald-100 text-emerald-700' : 'bg-brand-50 text-brand-700'}`}>
           {m.reported ? <CheckCircle2 className="w-5 h-5" /> : <Icon className="w-5 h-5" />}
@@ -158,6 +174,7 @@ const RoleCard: React.FC<{ m: DailyMine; last: boolean; onClick: () => void }> =
         {m.reported
           ? <span className={m.status === 'NORMAL' ? 'text-emerald-700 font-semibold' : 'text-orange-700 font-semibold'}>
               {m.status === 'NORMAL' ? 'Bình thường' : 'Có vụ việc'} · {m.submittedAt ? vnTime(m.submittedAt) : ''}<span className="block font-normal text-stone-500 truncate">Đ/c {m.reporterName}</span></span>
+          : notOpen ? <span className="text-stone-500 font-semibold">Chưa mở kỳ · mở {openLabel}</span>
           : <span className="text-brand-700 font-semibold">Chưa báo cáo</span>}
         {!!m.flash && <span className="block text-red-700 font-semibold">{m.flash} báo nhanh</span>}
       </div>

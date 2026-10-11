@@ -5,10 +5,10 @@ import { User, UserRole } from '../../types';
 import { Daily, dailyLink } from '../../services/dailyReportService';
 import { btnPrimary, btnSecondary, card, inputCls } from '../learning/common';
 
-interface Props { me: User; deadline: string; onDeadlineChanged: () => void; }
+interface Props { me: User; deadline: string; open?: string; onDeadlineChanged: () => void; }
 
 /** Thiết lập: 1 link / 1 mã QR chung cho cả đơn vị; giờ chốt kỳ báo cáo */
-export const DailySettings: React.FC<Props> = ({ me, deadline, onDeadlineChanged }) => {
+export const DailySettings: React.FC<Props> = ({ me, deadline, open, onDeadlineChanged }) => {
   const link = dailyLink();
   const [copied, setCopied] = useState(false);
   const copy = async () => {
@@ -35,7 +35,7 @@ export const DailySettings: React.FC<Props> = ({ me, deadline, onDeadlineChanged
           </div>
         </div>
       </section>
-      {(me.role === UserRole.ADMIN || me.role === UserRole.CHIEF) && <DeadlineBox deadline={deadline} onSaved={onDeadlineChanged} />}
+      {(me.role === UserRole.ADMIN || me.role === UserRole.CHIEF) && <DeadlineBox deadline={deadline} open={open || '06:00'} onSaved={onDeadlineChanged} />}
     </div>
   );
 };
@@ -52,20 +52,28 @@ const printQr = (link: string) => {
   w.document.close();
 };
 
-const DeadlineBox: React.FC<{ deadline: string; onSaved: () => void }> = ({ deadline, onSaved }) => {
+const DeadlineBox: React.FC<{ deadline: string; open: string; onSaved: () => void }> = ({ deadline, open, onSaved }) => {
   const [v, setV] = useState(deadline);
+  const [o, setO] = useState(open);
   const [msg, setMsg] = useState('');
+  // Giờ mở trước giờ chốt → mở cùng ngày; sau giờ chốt → mở từ hôm trước; bằng giờ chốt → luôn mở
+  const hint = o === v ? 'Luôn nhận báo cáo (không giới hạn giờ mở).'
+    : o < v ? `Kỳ ngày D nhận báo cáo từ ${o} đến ${v} ngày D. Từ ${v} đến ${o} hôm sau không nộp được cho kỳ mới, chỉ nộp bù kỳ vừa chốt.`
+    : `Kỳ ngày D nhận báo cáo từ ${o} ngày D-1 đến ${v} ngày D.`;
   return (
-    <section className={`${card} p-4`}>
-      <h3 className="font-bold text-stone-900 mb-1">Giờ chốt kỳ báo cáo và hạn nộp</h3>
-      <p className="text-[13px] text-stone-500 mb-2">Kỳ báo cáo ngày D tính từ giờ chốt ngày D-1 đến giờ chốt ngày D. Nộp sau giờ chốt bị ghi "nộp muộn".</p>
-      <div className="flex gap-2 items-center">
-        <input type="time" className={`${inputCls} w-32`} value={v} onChange={e => setV(e.target.value)} data-testid="deadline-input" />
-        <button className={btnPrimary} disabled={v === deadline} onClick={async () => {
-          const r = await Daily.setDeadline(v); setMsg(r.ok ? 'Đã lưu.' : r.message || 'Không lưu được.'); if (r.ok) onSaved();
+    <section className={`${card} p-4`} data-testid="daily-time-box">
+      <h3 className="font-bold text-stone-900 mb-1">Giờ mở kỳ, giờ chốt và hạn nộp</h3>
+      <p className="text-[13px] text-stone-500 mb-3">Kỳ báo cáo ngày D tính tình hình từ giờ chốt ngày D-1 đến giờ chốt ngày D. Nộp sau giờ chốt bị ghi "nộp muộn".
+        Giờ mở kỳ ngăn cán bộ báo cáo trễ buổi sáng nhưng lại rơi vào kỳ ngày hôm sau.</p>
+      <div className="flex flex-wrap gap-3 items-end">
+        <label className="text-[13px] font-semibold text-stone-700">Giờ mở kỳ<input type="time" className={`${inputCls} w-32 mt-1 block`} value={o} onChange={e => setO(e.target.value)} data-testid="open-input" /></label>
+        <label className="text-[13px] font-semibold text-stone-700">Giờ chốt / hạn nộp<input type="time" className={`${inputCls} w-32 mt-1 block`} value={v} onChange={e => setV(e.target.value)} data-testid="deadline-input" /></label>
+        <button className={btnPrimary} disabled={v === deadline && o === open} data-testid="time-save" onClick={async () => {
+          const r = await Daily.setDeadline(v, o); setMsg(r.ok ? 'Đã lưu.' : r.message || 'Không lưu được.'); if (r.ok) onSaved();
         }}>Lưu</button>
         {msg && <span className="text-sm text-stone-600">{msg}</span>}
       </div>
+      <p className="text-[13px] text-stone-700 mt-2">{hint}</p>
     </section>
   );
 };

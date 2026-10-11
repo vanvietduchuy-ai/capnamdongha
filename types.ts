@@ -467,6 +467,7 @@ export interface DailyMine {
   role: DailyRole;
   reported: boolean;
   overdue?: boolean;
+  prev?: boolean;            // đầu mối đã báo của kỳ vừa chốt (hiện khi kỳ mới chưa mở)
   status?: DailyStatus | null;
   reporterName?: string | null;
   submittedAt?: number | null;

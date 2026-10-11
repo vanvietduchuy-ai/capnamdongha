@@ -6,6 +6,9 @@
 --             Tổ Tổng hợp không báo cáo, chỉ tổng hợp.
 --  KỲ BÁO CÁO "ngày D": từ <giờ chốt> ngày D-1 đến <giờ chốt> ngày D (mặc định 07:30, giờ Việt Nam).
 --             Hạn nộp = giờ chốt ngày D. Nộp sau hạn → ghi "Nộp muộn".
+--             MỞ KỲ: chỉ nhận báo cáo kỳ D từ <giờ mở kỳ> (mặc định 06:00 ngày D) đến hạn nộp.
+--             Từ sau hạn nộp đến giờ mở kỳ kế tiếp KHÔNG nộp được cho kỳ mới → báo cáo trễ buổi sáng
+--             không bị tính nhầm sang ngày hôm sau; app hướng vào "Nộp bù" của kỳ vừa đóng.
 --  NGƯỜI BÁO: KHÔNG phân công cố định. Dùng chung 1 link / 1 mã QR cho cả đơn vị.
 --             Cán bộ đăng nhập, chọn TỔ CỦA MÌNH hoặc Trực ban hình sự / Trực ban đơn vị
 --             rồi báo cáo — vì người trực ban, người
@@ -93,6 +96,7 @@ ALTER TABLE daily_dups ADD COLUMN IF NOT EXISTS "markedAt"  bigint;
 
 INSERT INTO app_settings (key, value) VALUES
   ('daily_deadline',    '07:30'),  -- giờ chốt kỳ báo cáo và hạn nộp (giờ Việt Nam)
+  ('daily_open',        '06:00'),  -- giờ mở nhận báo cáo của kỳ (trước giờ chốt; bằng giờ chốt = luôn mở)
   ('daily_late_days',   '7')       -- được nộp bù tối đa bao nhiêu ngày
 ON CONFLICT (key) DO NOTHING;
 
@@ -144,6 +148,24 @@ BEGIN
   RETURN v::time;
 EXCEPTION WHEN others THEN RETURN '07:30'::time;
 END;
+$$;
+
+CREATE OR REPLACE FUNCTION daily_open_time() RETURNS time
+LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public AS $$
+DECLARE v text := get_setting('daily_open', '06:00');
+BEGIN
+  RETURN v::time;
+EXCEPTION WHEN others THEN RETURN '06:00'::time;
+END;
+$$;
+
+-- Thời điểm bắt đầu nhận báo cáo kỳ ngày D:
+--   giờ mở < giờ chốt → giờ mở cùng ngày D (VD 06:00 ngày D, chốt 07:30 ngày D)
+--   giờ mở >= giờ chốt → giờ mở ngày D-1 (VD 17:00 ngày D-1); đặt bằng giờ chốt = mở ngay khi kỳ trước đóng
+CREATE OR REPLACE FUNCTION daily_open_at(p_day date) RETURNS timestamptz
+LANGUAGE sql STABLE AS $$
+  SELECT (CASE WHEN daily_open_time() < daily_deadline_time() THEN p_day ELSE p_day - 1 END + daily_open_time())
+         AT TIME ZONE 'Asia/Ho_Chi_Minh'
 $$;
 
 -- Thời điểm hết hạn của kỳ báo cáo ngày D
@@ -261,13 +283,24 @@ BEGIN
     IF v_start IS NOT NULL AND prev >= v_start
        AND NOT EXISTS (SELECT 1 FROM daily_reports WHERE day = prev AND unit = u AND active) THEN
       mine := mine || jsonb_build_object('unit', u, 'unitName', daily_unit_name(u), 'day', prev, 'role', v_role, 'reported', false, 'overdue', true);
+    ELSIF now() < daily_open_at(d) THEN
+      -- Kỳ mới chưa mở: hiện cả các đầu mối đã báo của kỳ vừa chốt để xem / bổ sung, đính chính
+      rep := NULL;
+      SELECT * INTO rep FROM daily_reports WHERE day = prev AND unit = u AND active LIMIT 1;
+      IF rep.id IS NOT NULL THEN
+        mine := mine || jsonb_build_object('unit', u, 'unitName', daily_unit_name(u), 'day', prev, 'role', v_role, 'prev', true,
+                  'reported', true, 'status', rep.status, 'reporterName', rep."reporterName", 'submittedAt', rep."submittedAt");
+      END IF;
     END IF;
   END LOOP;
   RETURN jsonb_build_object('ok', true,
-    'v', 4,                         -- phiên bản hàm máy chủ (ứng dụng dùng để phát hiện máy chủ chưa cập nhật)
+    'v', 5,                         -- phiên bản hàm máy chủ (ứng dụng dùng để phát hiện máy chủ chưa cập nhật)
     'currentDay', d,
     'deadline', to_char(daily_deadline_time(), 'HH24:MI'),
     'deadlineAt', (extract(epoch FROM daily_deadline_at(d)) * 1000)::bigint,
+    'open', to_char(daily_open_time(), 'HH24:MI'),
+    'openAt', (extract(epoch FROM daily_open_at(d)) * 1000)::bigint,
+    'isOpen', now() >= daily_open_at(d),
     'serverNow', now_ms(),
     'lateDays', get_setting('daily_late_days', '7')::int,
     'canManage', can_manage_daily(actor),
@@ -301,6 +334,7 @@ BEGIN
     'day', p_day, 'currentDay', daily_current_day(),
     'deadlineAt', (extract(epoch FROM daily_deadline_at(p_day)) * 1000)::bigint,
     'periodFrom', (extract(epoch FROM daily_deadline_at(p_day - 1)) * 1000)::bigint,
+    'openAt', (extract(epoch FROM daily_open_at(p_day)) * 1000)::bigint,
     'unitInfo', daily_unit_json(p_day, p_unit), 'others', others);
 END;
 $$;
@@ -319,6 +353,14 @@ BEGIN
   IF v_role IS NULL THEN RETURN err('Tài khoản này không dùng để báo cáo ngày (tài khoản quản trị hoặc chưa được duyệt).'); END IF;
   cur := daily_current_day();
   IF p_day > cur THEN RETURN err('Chưa đến kỳ báo cáo ngày ' || to_char(p_day, 'DD/MM/YYYY') || '.'); END IF;
+  -- Chưa đến giờ mở kỳ: không nhận, tránh báo cáo trễ của kỳ vừa đóng bị tính sang kỳ mới
+  IF now() < daily_open_at(p_day) THEN
+    RETURN jsonb_build_object('ok', false, 'code', 'NOT_OPEN',
+      'message', 'Kỳ báo cáo ngày ' || to_char(p_day, 'DD/MM/YYYY') || ' chưa mở. Nhận báo cáo từ ' ||
+                 to_char(daily_open_at(p_day) AT TIME ZONE 'Asia/Ho_Chi_Minh', 'HH24:MI "ngày" DD/MM') || ' đến ' ||
+                 to_char(daily_deadline_at(p_day) AT TIME ZONE 'Asia/Ho_Chi_Minh', 'HH24:MI "ngày" DD/MM') ||
+                 '. Nếu đang báo cáo tình hình kỳ vừa đóng (ngày ' || to_char(p_day - 1, 'DD/MM') || '), chọn mục "Nộp bù".');
+  END IF;
   IF p_day < cur - get_setting('daily_late_days', '7')::int THEN RETURN err('Đã quá thời hạn nộp bù cho ngày này. Liên hệ Tổ Tổng hợp.'); END IF;
   IF coalesce(p_confirm, false) IS NOT TRUE THEN RETURN err('Cần đánh dấu xác nhận chịu trách nhiệm về nội dung báo cáo.'); END IF;
   IF p_status NOT IN ('NORMAL', 'INCIDENT') THEN RETURN err('Trạng thái báo cáo không hợp lệ.'); END IF;
@@ -518,8 +560,9 @@ BEGIN
 END;
 $$;
 
--- Đổi giờ chốt / hạn nộp (chỉ Quản trị viên, Trưởng CAP)
-CREATE OR REPLACE FUNCTION app_daily_settings(p_token text, p_deadline text)
+-- Đổi giờ chốt / hạn nộp và giờ mở kỳ (chỉ Quản trị viên, Trưởng CAP)
+DROP FUNCTION IF EXISTS app_daily_settings(text, text);
+CREATE OR REPLACE FUNCTION app_daily_settings(p_token text, p_deadline text, p_open text DEFAULT NULL)
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions AS $$
 DECLARE actor users%ROWTYPE;
 BEGIN
@@ -527,8 +570,13 @@ BEGIN
   IF actor.id IS NULL THEN RETURN expired_msg(); END IF;
   IF actor.role NOT IN ('ADMIN', 'CHIEF') THEN RETURN err('Chỉ Quản trị viên, Trưởng Công an phường đổi được giờ chốt báo cáo.'); END IF;
   IF p_deadline !~ '^([01]\d|2[0-3]):[0-5]\d$' THEN RETURN err('Giờ chốt không hợp lệ (dạng HH:MM).'); END IF;
+  IF p_open IS NOT NULL AND p_open !~ '^([01]\d|2[0-3]):[0-5]\d$' THEN RETURN err('Giờ mở kỳ không hợp lệ (dạng HH:MM).'); END IF;
   INSERT INTO app_settings (key, value) VALUES ('daily_deadline', p_deadline)
   ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;
+  IF p_open IS NOT NULL THEN
+    INSERT INTO app_settings (key, value) VALUES ('daily_open', p_open)
+    ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;
+  END IF;
   RETURN jsonb_build_object('ok', true);
 END;
 $$;
@@ -567,7 +615,7 @@ BEGIN
   FOR f IN SELECT p.oid::regprocedure AS sig FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
            WHERE n.nspname = 'public'
              AND p.proname IN ('daily_role','daily_uname','daily_notify','daily_managers','daily_report_json',
-                               'daily_unit_json','daily_remind','daily_deadline_time')
+                               'daily_unit_json','daily_remind','daily_deadline_time','daily_open_time')
   LOOP
     EXECUTE format('REVOKE EXECUTE ON FUNCTION %s FROM PUBLIC, anon, authenticated', f.sig);
   END LOOP;

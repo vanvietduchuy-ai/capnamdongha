@@ -90,10 +90,11 @@ export const periodText = (day: string, deadline: string) => {
 /* ============================ GỌI MÁY CHỦ ============================ */
 export interface DailyMe {
   currentDay: string; deadline: string; deadlineAt: number; serverNow: number; lateDays: number;
+  open?: string; openAt?: number; isOpen?: boolean;   // mốc mở kỳ (máy chủ bản 5 trở lên)
   canManage: boolean; leaderOf: DailyUnit[]; mine: DailyMine[];
 }
 export interface DailyGet {
-  role: string | null; canSubmit: boolean; day: string; currentDay: string; deadlineAt: number; periodFrom: number;
+  role: string | null; canSubmit: boolean; day: string; currentDay: string; deadlineAt: number; periodFrom: number; openAt?: number;
   unitInfo: DailyUnitInfo; others: DailyOtherIncident[];
 }
 export interface DailyBoard {
@@ -127,12 +128,13 @@ export const Daily = {
   me: async (): R<Partial<DailyMe>> => {
     const r = await callRpc<any>('app_daily_me', { p_token: tok() });
     return { ...r, mine: arr<DailyMine>(r.mine), leaderOf: arr<DailyUnit>(r.leaderOf),
-      deadlineAt: Number(r.deadlineAt) || 0, serverNow: Number(r.serverNow) || Date.now() };
+      deadlineAt: Number(r.deadlineAt) || 0, serverNow: Number(r.serverNow) || Date.now(),
+      openAt: Number(r.openAt) || 0, isOpen: r.isOpen !== false };
   },
   get: async (day: string, unit: DailyUnit): R<Partial<DailyGet>> => {
     const r = await callRpc<any>('app_daily_get', { p_token: tok(), p_day: day, p_unit: unit });
     return { ...r, unitInfo: r.unitInfo ? normUnit(r.unitInfo) : undefined, others: arr<DailyOtherIncident>(r.others),
-      deadlineAt: Number(r.deadlineAt) || 0, periodFrom: Number(r.periodFrom) || 0 };
+      deadlineAt: Number(r.deadlineAt) || 0, periodFrom: Number(r.periodFrom) || 0, openAt: Number(r.openAt) || 0 };
   },
   submit: async (p: { day: string; unit: DailyUnit; status: DailyStatus; note: string; incidents: DailyIncident[]; reason: string; confirm: boolean }) => {
     const r = await callRpc<any>('app_daily_submit', {
@@ -161,7 +163,7 @@ export const Daily = {
   markDup: (day: string, key: string, dupOf: string | null, clear = false) =>
     callRpc('app_daily_mark_dup', { p_token: tok(), p_day: day, p_key: key, p_dup_of: dupOf || '', p_clear: clear }),
   remind: (day: string) => callRpc<{ sent: number }>('app_daily_remind', { p_token: tok(), p_day: day }),
-  setDeadline: (hhmm: string) => callRpc('app_daily_settings', { p_token: tok(), p_deadline: hhmm })
+  setDeadline: (hhmm: string, open?: string) => callRpc('app_daily_settings', { p_token: tok(), p_deadline: hhmm, ...(open ? { p_open: open } : {}) })
 };
 
 const cleanIncident = (i: DailyIncident) => ({

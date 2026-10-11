@@ -315,8 +315,14 @@ Mục **Báo cáo ngày** trên menu. **6 đầu mối** báo cáo: Tổ An ninh
 **Kỳ báo cáo và hạn nộp**
 
 - Kỳ báo cáo "ngày D" tính từ **07 giờ 30 ngày D-1 đến 07 giờ 30 ngày D**. Hạn nộp là 07 giờ 30 ngày D.
+- **Giờ mở kỳ** (mặc định **06:00**): kỳ "ngày D" chỉ nhận báo cáo từ 06 giờ 00 đến 07 giờ 30 ngày D.
+  - Từ 07 giờ 30 ngày D đến 06 giờ 00 ngày D+1, app **không cho nộp vào kỳ ngày D+1**. Nhờ vậy cán bộ báo cáo trễ buổi sáng không bị tính nhầm sang ngày hôm sau.
+  - Trong khoảng này, mục Báo cáo hiện **Kỳ ngày D (vừa chốt)**: đầu mối chưa báo thì **Nộp bù** (ghi muộn), đầu mối đã báo thì xem, bổ sung, đính chính.
+  - **Báo cáo nhanh** vụ việc nghiêm trọng vẫn dùng được mọi lúc.
+  - Muốn kỳ luôn mở như trước thì đặt giờ mở kỳ bằng giờ chốt.
 - Nộp sau hạn vẫn được (tối đa 7 ngày) nhưng bị ghi **nộp muộn**.
-- Đổi giờ chốt: Trưởng CAP hoặc Quản trị viên vào thẻ **Mã QR** → mục **Giờ chốt**.
+- Đổi giờ mở kỳ, giờ chốt: Trưởng CAP hoặc Quản trị viên vào thẻ **Mã QR** → mục **Giờ mở kỳ, giờ chốt và hạn nộp**.
+- Sau khi cập nhật bản này phải **chạy lại file 09_bao_cao_ngay.sql** trên Supabase (máy chủ chưa cập nhật thì kỳ báo cáo vẫn luôn mở như cũ).
 - Nếu Supabase đã bật pg_cron (Integrations → Cron), app **tự nhắc** lúc 07 giờ 00: đầu mối là tổ thì nhắc toàn bộ cán bộ của tổ; Trực ban hình sự, Trực ban đơn vị chưa báo thì nhắc chỉ huy và người theo dõi báo cáo ngày để liên hệ người đang trực. Đổi giờ chốt thì sửa giờ nhắc ở đó. Ngoài ra người theo dõi có thể bấm **Nhắc đầu mối chưa báo** bất cứ lúc nào.
 
 **Không phân công cố định — 1 link, 1 mã QR chung** (thẻ **Mã QR**)

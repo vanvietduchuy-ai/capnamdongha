@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, CheckCircle2, ChevronDown, ChevronLeft, History, Loader2, Minus, Plus, Siren, Trash2, X, Zap } from 'lucide-react';
 import { DailyIncident, DailyOtherIncident, DailyReport, DailyStatus, DailyUnit, User } from '../../types';
 import {
-  blankIncident, Daily, DailyGet, dayShort, FIELDS, HANDLINGS, incidentError, KINDS, parseIncidentText, SEVERITIES, unitName, vnDateTime, vnTime
+  addDays, blankIncident, Daily, DailyGet, dayShort, periodText, FIELDS, HANDLINGS, incidentError, KINDS, parseIncidentText, SEVERITIES, unitName, vnDateTime, vnTime
 } from '../../services/dailyReportService';
 import { btnPrimary, btnSecondary, card, Chip, Sheet } from '../learning/common';
 import { HistorySheet } from './DailyBoard';
@@ -94,7 +94,11 @@ export const DailyForm: React.FC<Props> = ({ day, unit, deadline, clockOffset, r
   const deadlineAt = info?.deadlineAt || 0;
   const past = deadlineAt > 0 && now > deadlineAt;
   const needReason = !!rep && past;
-  const canSubmit = info ? !!info.canSubmit : true;
+  // Kỳ chưa đến giờ mở: không nhận báo cáo (tránh báo cáo trễ của kỳ trước rơi vào kỳ này)
+  const openAt = info?.openAt || 0;
+  const notOpen = openAt > 0 && now < openAt;
+  const canSubmit = (info ? !!info.canSubmit : true) && !notOpen;
+  const canFlash = info ? !!info.canSubmit : true;
   const isCurrent = info?.currentDay === day;
 
   const touch = () => { touched.current = true; setMsg(''); };
@@ -132,9 +136,10 @@ export const DailyForm: React.FC<Props> = ({ day, unit, deadline, clockOffset, r
       <button onClick={onBack} className="p-2 -ml-2 rounded-lg hover:bg-stone-100" aria-label="Quay lại"><ChevronLeft className="w-6 h-6" /></button>
       <div className="min-w-0 flex-1">
         <div className="font-bold text-stone-900 text-[19px] leading-tight truncate">{unitName(unit)}</div>
-        <div className={`text-[13px] ${past ? 'text-red-700 font-semibold' : 'text-stone-500'}`}>
-          Báo cáo ngày {dayShort(day)} · {past ? 'đã quá hạn' : `hạn ${deadline}${left > 0 ? ` (${fmtLeft(left)})` : ''}`}
+        <div className={`text-[13px] ${past ? 'text-red-700 font-semibold' : 'text-stone-500'}`} data-testid="daily-form-day">
+          Báo cáo ngày {dayShort(day)} · {notOpen ? `mở lúc ${vnTime(openAt)}` : past ? 'đã quá hạn, ghi nộp muộn' : `hạn ${deadline}${left > 0 ? ` (${fmtLeft(left)})` : ''}`}
         </div>
+        <div className="text-[12px] text-stone-400 leading-tight" data-testid="daily-form-period">Tình hình {periodText(day, deadline)}</div>
       </div>
     </div>
   );
@@ -169,7 +174,7 @@ export const DailyForm: React.FC<Props> = ({ day, unit, deadline, clockOffset, r
           <button className={btnPrimary} onClick={onBack}>Xong</button>
         </div>
         <div className="flex flex-wrap gap-x-4 gap-y-1 mt-3">
-          {canSubmit && isCurrent && <button className="text-[14px] font-semibold text-red-700 inline-flex items-center gap-1.5 h-9" onClick={() => setFlashOpen(true)}><Siren className="w-4 h-4" />Báo cáo nhanh vụ việc</button>}
+          {canFlash && isCurrent && <button className="text-[14px] font-semibold text-red-700 inline-flex items-center gap-1.5 h-9" onClick={() => setFlashOpen(true)}><Siren className="w-4 h-4" />Báo cáo nhanh vụ việc</button>}
           {(info?.unitInfo?.versions || 0) > 1 && <button className="text-[14px] font-semibold text-stone-600 inline-flex items-center gap-1.5 h-9" onClick={() => setHistoryOpen(true)}><History className="w-4 h-4" />Lịch sử ({info?.unitInfo?.versions})</button>}
         </div>
         <FlashSheet open={flashOpen} unit={unit} onClose={() => setFlashOpen(false)} onDone={() => { setFlashOpen(false); touched.current = false; load(); }} />
@@ -182,7 +187,10 @@ export const DailyForm: React.FC<Props> = ({ day, unit, deadline, clockOffset, r
   return (
     <div className="max-w-2xl" data-testid="daily-form">
       {header}
-      {!canSubmit && <div className="mb-3 rounded-xl bg-amber-50 text-amber-900 px-4 py-3 text-[14px]">Tài khoản này chỉ xem, không báo cáo ngày.</div>}
+      {notOpen && <div className="mb-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 px-4 py-3 text-[14px] leading-snug" data-testid="daily-form-not-open">
+        <b>Kỳ báo cáo ngày {dayShort(day)} chưa mở.</b> Nhận báo cáo từ <b>{vnDateTime(openAt)}</b>. Nếu đồng chí đang báo tình hình ngày {dayShort(addDays(day, -1))} (kỳ vừa chốt), quay lại và chọn <b>Nộp bù</b>.
+        {canFlash && <> Vụ việc nghiêm trọng mới xảy ra: dùng <b>Báo cáo nhanh</b> bên dưới.</>}</div>}
+      {!notOpen && info && !info.canSubmit && <div className="mb-3 rounded-xl bg-amber-50 text-amber-900 px-4 py-3 text-[14px]">Tài khoản này chỉ xem, không báo cáo ngày.</div>}
       {rep && <div className="mb-3 rounded-xl bg-blue-50 text-blue-900 px-4 py-2.5 text-[14px]">Đính chính bản nộp lúc {vnDateTime(rep.submittedAt)} (đ/c {rep.reporterName}).</div>}
 
       {/* Tình hình trong kỳ */}
@@ -232,7 +240,7 @@ export const DailyForm: React.FC<Props> = ({ day, unit, deadline, clockOffset, r
         </div>
       )}
 
-      {canSubmit && isCurrent && !rep && (
+      {canFlash && isCurrent && !rep && (
         <button className="mt-2 text-[14px] font-semibold text-red-700 inline-flex items-center gap-1.5 h-9" onClick={() => setFlashOpen(true)} data-testid="daily-flash-open">
           <Zap className="w-4 h-4" />Báo cáo nhanh vụ việc nghiêm trọng</button>
       )}
