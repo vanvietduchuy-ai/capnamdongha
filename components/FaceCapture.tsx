@@ -63,8 +63,10 @@ export const FaceCapture: React.FC<Props> = ({ mode, onDone, onCancel }) => {
       const v = videoRef.current!;
       v.srcObject = stream;
       await v.play().catch(() => {});
-      setLoadMsg('Đang tải bộ nhận diện khuôn mặt (lần đầu mất 5–20 giây)...');
-      const api = await loadFaceApi();
+      setLoadMsg('Đang tải bộ nhận diện khuôn mặt (lần đầu mất 5–30 giây, mạng yếu có thể lâu hơn)...');
+      // Máy yếu / mạng chậm: sau 30 giây vẫn chưa xong thì hiện các cách dự phòng, vẫn chờ tiếp
+      const slowTimer = window.setTimeout(() => { if (aliveRef.current && phaseRef.current === 'loading') setSlow(true); }, 30000);
+      const api = await loadFaceApi().finally(() => window.clearTimeout(slowTimer));
       if (!aliveRef.current) return;
       go('center1');
       loop(api);
@@ -78,7 +80,7 @@ export const FaceCapture: React.FC<Props> = ({ mode, onDone, onCancel }) => {
             ? 'Trình duyệt này không mở được camera trước.'
             : n === 'NotReadableError'
               ? 'Camera đang bị ứng dụng khác dùng (ví dụ cuộc gọi video). Tắt ứng dụng đó rồi thử lại.'
-              : 'Không tải được bộ nhận diện khuôn mặt. Kiểm tra mạng rồi thử lại.'
+              : 'Không tải hoặc không chạy được bộ nhận diện khuôn mặt (mạng chậm hoặc máy yếu). Thử lại, hoặc dùng cách khác bên dưới.'
       );
       go('error');
     }
@@ -257,7 +259,7 @@ export const FaceCapture: React.FC<Props> = ({ mode, onDone, onCancel }) => {
       {showFallback && (
         <div className="bg-white rounded-xl border border-stone-200 p-4 space-y-2">
           <p className="text-[13px] text-stone-600">{phase === 'error' ? 'Hoặc dùng cách khác:' : 'Chưa chụp được? Dùng cách khác:'}</p>
-          {phase !== 'error' && (
+          {phase !== 'error' && phase !== 'loading' && (
             <Button onClick={captureNow} variant="secondary" size="lg" className="w-full" icon={<Camera className="w-5 h-5" />}>Chụp ngay (bỏ bước quay đầu)</Button>
           )}
           <Button onClick={() => fileRef.current?.click()} variant="secondary" size="lg" className="w-full" disabled={busyFile}

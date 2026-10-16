@@ -60,6 +60,11 @@ export const AttendanceScanner: React.FC<AttendanceScannerProps> = ({ currentUse
       try {
         const cfg = await MockDB.getCheckinConfig();
         setFaceMode(cfg.faceMode);
+        // Tải sẵn bộ nhận diện ngay khi mở màn hình điểm danh (máy yếu/mạng chậm đỡ phải chờ)
+        if (cfg.faceMode !== 'off') {
+          const idle = (window as any).requestIdleCallback || ((f: () => void) => window.setTimeout(f, 300));
+          idle(() => { import('../lib/faceCheck').then(m => m.loadFaceApi()).catch(() => { /* lỗi thì lúc chụp tải lại */ }); });
+        }
       } catch { /* mặc định không chụp mặt */ }
       finally { setIsSystemReady(true); }
     })();
