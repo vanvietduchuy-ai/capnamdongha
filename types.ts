@@ -151,6 +151,42 @@ export interface AttendanceRecord {
   guestName?: string;  // Khách mời: họ tên
   guestUnit?: string;  // Khách mời: đơn vị
   guestPhone?: string; // Khách mời: số điện thoại
+  // Chống điểm danh hộ (file SQL 11)
+  serverIp?: string | null;       // IP do máy chủ ghi nhận
+  faceDist?: number | null;       // Khoảng cách khuôn mặt so với ảnh mẫu (nhỏ = giống)
+  checkFlags?: CheckFlag[] | null;
+  reviewStatus?: 'PENDING' | 'OK' | null;
+  reviewedBy?: string | null;
+  reviewedAt?: number | null;
+}
+
+export type CheckFlagCode =
+  | 'FACE_ENROLL' | 'FACE_WEAK' | 'FACE_NONE' | 'FACE_FILE' | 'FACE_NOLIVE' | 'FACE_LIKE_OTHER' | 'FACE_DUP_ENROLL'
+  | 'DEVICE_NEW' | 'DEVICE_CHANGE_LIMIT' | 'DEVICE_OF_OTHER' | 'SAME_DEVICE'
+  | 'IP_UNCHECKED' | 'IP_BAD' | 'MANUAL_OK';
+
+export interface CheckFlag { code: CheckFlagCode; ref?: string; refName?: string; }
+
+/** Gửi kèm khi điểm danh: kết quả chụp khuôn mặt */
+export interface CheckInFace {
+  descriptor?: number[];
+  photo?: string;
+  live?: boolean;
+  method: 'camera' | 'file' | 'none';
+  reason?: string;
+}
+
+/** Lượt điểm danh bị từ chối (VPN, mặt không khớp...) */
+export interface CheckInAttempt {
+  id: string;
+  userId: string;
+  reason: 'IP_BLOCKED' | 'FACE_MISMATCH' | 'FACE_REQUIRED' | 'REJECTED_BY_REVIEW';
+  detail?: string | null;
+  faceDist?: number | null;
+  serverIp?: string | null;
+  createdAt: number;
+  resolved?: 'ACCEPTED' | 'DISMISSED' | null;
+  hasPhoto?: boolean;
 }
 
 export interface AttendanceAbsence {

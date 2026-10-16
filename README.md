@@ -26,7 +26,7 @@ Các bước chi tiết tại mục 8 của file [HUONG_DAN_SUPABASE.md](./HUONG
 ## Kết nối cơ sở dữ liệu
 
 Xem hướng dẫn chi tiết tại [HUONG_DAN_SUPABASE.md](./HUONG_DAN_SUPABASE.md).
-Cơ sở dữ liệu: 8 file SQL trong thư mục `supabase/` (chạy theo thứ tự 01 → 08).
+Cơ sở dữ liệu: các file SQL trong thư mục `supabase/` (chạy theo thứ tự 01 → 11).
 
 ## Cấu trúc chính
 
@@ -43,6 +43,10 @@ Cơ sở dữ liệu: 8 file SQL trong thư mục `supabase/` (chạy theo thứ
 | `components/learning/` | Giao diện Học tập & Thi (học bài, ôn tập, làm bài thi, giám thị, kết quả) |
 | `lib/exam.ts`, `services/learningService.ts` | Đọc Excel câu hỏi, phân tích nghi vấn; gọi hàm máy chủ |
 | `public/mau_ngan_hang_cau_hoi.xlsx` | Mẫu Excel ngân hàng câu hỏi |
+| `supabase/11_chong_diem_danh_ho.sql` | Chống điểm danh hộ: chụp khuôn mặt, gắn thiết bị, cảnh báo 1 máy nhiều trình duyệt, chặn IP VPN |
+| `components/FaceCapture.tsx`, `lib/faceCheck.ts`, `public/models/` | Chụp và nhận diện khuôn mặt trên điện thoại (bước 1 trước khi quét mã) |
+| `components/CheckInReview.tsx`, `lib/checkFlags.ts` | Ban tổ chức kiểm tra lượt điểm danh nghi vấn / bị từ chối |
+| `lib/deviceFingerprint.ts` | Mã thiết bị + dấu vân tay phần cứng |
 | `supabase/dat_lai_mat_khau_123123.sql` | Đặt lại mật khẩu mọi tài khoản về 123123 (chạy khi cần) |
 | `lib/brand.ts` | Tên đơn vị, đường dẫn logo |
 | `index.css` | Bộ quy chuẩn giao diện: màu, bo góc, bóng, chữ |
