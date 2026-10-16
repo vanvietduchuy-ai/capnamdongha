@@ -8,7 +8,7 @@
 --     trong 15 phút, khác tài khoản → CẢNH BÁO (không chặn).
 --  3) Gắn tài khoản với thiết bị: lần đầu tự gắn, đổi máy thì cảnh báo; đổi quá
 --     1 lần trong 30 ngày thì chờ duyệt.
---  4) Chặn IP trung tâm dữ liệu / VPN / proxy / Tor (tra cứu ipapi.is, lưu đệm 7 ngày).
+--  4) Chặn IP trung tâm dữ liệu / VPN / proxy / Tor (tra cứu ip-api.com, lưu đệm 7 ngày).
 --     Dịch vụ tra cứu lỗi → vẫn cho điểm danh, gắn cờ.
 --
 -- Nguyên tắc: chỉ CHẶN khi chắc chắn (IP VPN, mặt không khớp rõ). Còn lại cho điểm danh
@@ -119,6 +119,8 @@ CREATE TABLE IF NOT EXISTS ip_reputation (
   manual       boolean NOT NULL DEFAULT false,   -- Ban tổ chức cho phép thủ công
   "checkedAt"  timestamptz DEFAULT now()
 );
+-- Xoá kết quả tra cứu tự động cũ (giữ IP Ban tổ chức đã cho phép) khi chạy lại file này
+DELETE FROM ip_reputation WHERE manual = false;
 
 DO $$
 DECLARE t text;
@@ -172,10 +174,11 @@ BEGIN
     RETURN jsonb_build_object('checked', true, 'bad', r.bad, 'kind', r.kind, 'org', r.org, 'cached', true);
   END IF;
 
+  -- ip-api.com (miễn phí, dùng phi thương mại, 45 lượt/phút; có lưu đệm nên đủ dùng)
   BEGIN
     PERFORM extensions.http_set_curlopt('CURLOPT_TIMEOUT_MS', '2500');
     SELECT status, content INTO v_status, v_body
-      FROM extensions.http_get('https://api.ipapi.is/?q=' || p_ip);
+      FROM extensions.http_get('http://ip-api.com/json/' || p_ip || '?fields=status,message,proxy,hosting,isp,org,as');
   EXCEPTION WHEN others THEN
     RETURN jsonb_build_object('checked', false, 'error', left(SQLERRM, 200));
   END;
@@ -188,16 +191,16 @@ BEGIN
   EXCEPTION WHEN others THEN
     RETURN jsonb_build_object('checked', false, 'error', 'Dữ liệu tra cứu không hợp lệ');
   END;
-  IF j ? 'error' THEN RETURN jsonb_build_object('checked', false, 'error', left(j->>'error', 200)); END IF;
+  IF coalesce(j->>'status', '') <> 'success' THEN
+    RETURN jsonb_build_object('checked', false, 'error', left(coalesce(j->>'message', 'tra cứu thất bại'), 200));
+  END IF;
 
   v_kind := CASE
-    WHEN (j->>'is_tor')::boolean        THEN 'Tor'
-    WHEN (j->>'is_vpn')::boolean        THEN 'VPN'
-    WHEN (j->>'is_proxy')::boolean      THEN 'Proxy'
-    WHEN (j->>'is_datacenter')::boolean THEN 'Trung tâm dữ liệu'
+    WHEN coalesce((j->>'proxy')::boolean, false)   THEN 'VPN/Proxy'
+    WHEN coalesce((j->>'hosting')::boolean, false) THEN 'Trung tâm dữ liệu'
     ELSE NULL END;
   v_bad := v_kind IS NOT NULL;
-  v_org := left(coalesce(j#>>'{datacenter,datacenter}', j#>>'{vpn,service}', j#>>'{company,name}', j#>>'{asn,org}', ''), 120);
+  v_org := left(coalesce(nullif(j->>'isp', ''), nullif(j->>'org', ''), j->>'as', ''), 120);
 
   INSERT INTO ip_reputation (ip, bad, kind, org, manual, "checkedAt")
   VALUES (p_ip, v_bad, v_kind, v_org, false, now())
