@@ -1,4 +1,4 @@
-import { User, UserRole, UserDepartment, Task, TaskStatus, TaskPriority, RecurringType, AppNotification, Utility, CalendarEvent, AttendanceRecord, AttendanceSession, AttendanceAbsence, SeatLayout, SeatFlag, sessionState, sessionTime } from '../types';
+import { User, UserRole, UserDepartment, Task, TaskStatus, TaskPriority, RecurringType, AppNotification, Utility, CalendarEvent, AttendanceRecord, AttendanceSession, AttendanceAbsence, SeatLayout, SeatFlag, sessionState, sessionTime, CheckInFace, CheckInAttempt } from '../types';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { buildClient, setClientConfig, getClient, CloudConfig as StoredCloudConfig, callRpc, getSessionToken, setSessionToken } from '../lib/supabase';
 import { EmailService } from './emailService';
@@ -1037,21 +1037,27 @@ export const MockDB = {
     }
   },
 
-  checkIn: async (userId: string, deviceId: string, sessionId: string, ipAddress?: string, fingerprint?: string, qrText?: string): Promise<{ success: boolean; message: string }> => {
+  checkIn: async (userId: string, deviceId: string, sessionId: string, ipAddress?: string, fingerprint?: string, qrText?: string, face?: CheckInFace | null): Promise<{ success: boolean; message: string; pending?: boolean; enrolled?: boolean; faceRejected?: boolean }> => {
     if (supabase) {
         // Máy chủ tự xác định người điểm danh theo phiên đăng nhập -> không thể điểm danh hộ;
-        // nội dung mã QR được máy chủ kiểm tra chữ ký + độ mới (đổi 3 giây/lần)
-        const res = await callRpc<{ title: string }>('app_check_in', {
+        // nội dung mã QR được máy chủ kiểm tra chữ ký + độ mới (đổi 3 giây/lần).
+        // Khuôn mặt, thiết bị, IP do máy chủ kiểm tra (file SQL 11).
+        const base = {
             p_token: getSessionToken(),
             p_session_id: sessionId,
             p_device_id: deviceId,
             p_ip: ipAddress || null,
             p_fingerprint: fingerprint || null,
             p_qr: qrText || null
-        });
+        };
+        let res = await callRpc<{ title: string; pending?: boolean; enrolled?: boolean }>('app_check_in', { ...base, p_face: face || null });
+        // Máy chủ chưa chạy file SQL 11 → gọi theo kiểu cũ để không gián đoạn điểm danh
+        if (!res.ok && (res.code === 'PGRST202' || res.code === '42883')) {
+            res = await callRpc<{ title: string }>('app_check_in', base);
+        }
         return res.ok
-            ? { success: true, message: 'Điểm danh thành công!' }
-            : { success: false, message: res.message || 'Không điểm danh được.' };
+            ? { success: true, message: 'Điểm danh thành công!', pending: !!res.pending, enrolled: !!res.enrolled }
+            : { success: false, message: res.message || 'Không điểm danh được.', faceRejected: /Khuôn mặt không khớp/.test(res.message || '') };
     }
 
     const session = await MockDB.getSessionById(sessionId);
@@ -1128,6 +1134,53 @@ export const MockDB = {
   },
 
   // Mã QR động: người quản lý lấy khoá ký của hội nghị (kèm giờ máy chủ để bù lệch đồng hồ)
+  /** Chế độ chụp mặt khi điểm danh: 'flag' | 'strict' | 'off' */
+  getCheckinConfig: async (): Promise<{ faceMode: 'flag' | 'strict' | 'off' }> => {
+      if (!supabase) return { faceMode: 'off' };
+      const res = await callRpc<{ faceMode: string }>('app_checkin_config', {});
+      if (!res.ok) return { faceMode: 'off' };   // máy chủ chưa chạy file SQL 11
+      const m = res.faceMode;
+      return { faceMode: m === 'strict' || m === 'off' ? m : 'flag' };
+  },
+
+  getCheckinReview: async (sessionId: string): Promise<{ ok: boolean; message?: string; attempts: CheckInAttempt[]; faces: Record<string, 'PENDING' | 'APPROVED'> }> => {
+      if (!supabase) return { ok: true, attempts: [], faces: {} };
+      const res = await callRpc<{ attempts: CheckInAttempt[]; faces: Record<string, 'PENDING' | 'APPROVED'> }>('app_checkin_review', {
+          p_token: getSessionToken(), p_session_id: sessionId
+      });
+      return { ok: res.ok, message: res.message, attempts: res.attempts || [], faces: res.faces || {} };
+  },
+
+  getCheckinPhoto: async (kind: 'record' | 'attempt', id: string): Promise<{ ok: boolean; message?: string; photo?: string | null; enrollPhoto?: string | null; enrollStatus?: string | null }> => {
+      if (!supabase) return { ok: false, message: 'Chưa kết nối máy chủ.' };
+      return callRpc('app_checkin_photo', { p_token: getSessionToken(), p_kind: kind, p_id: id });
+  },
+
+  decideCheckin: async (recordId: string, decision: 'OK' | 'REJECT'): Promise<{ ok: boolean; message?: string }> => {
+      if (!supabase) return { ok: false, message: 'Chưa kết nối máy chủ.' };
+      return callRpc('app_checkin_decide', { p_token: getSessionToken(), p_record_id: recordId, p_decision: decision });
+  },
+
+  resolveAttempt: async (attemptId: string, decision: 'ACCEPT' | 'DISMISS'): Promise<{ ok: boolean; message?: string }> => {
+      if (!supabase) return { ok: false, message: 'Chưa kết nối máy chủ.' };
+      return callRpc('app_attempt_resolve', { p_token: getSessionToken(), p_attempt_id: attemptId, p_decision: decision });
+  },
+
+  resetUserCheck: async (userId: string, what: 'FACE' | 'DEVICE'): Promise<{ ok: boolean; message?: string }> => {
+      if (!supabase) return { ok: false, message: 'Chưa kết nối máy chủ.' };
+      return callRpc('app_reset_user_check', { p_token: getSessionToken(), p_user_id: userId, p_what: what });
+  },
+
+  allowIp: async (ip: string): Promise<{ ok: boolean; message?: string }> => {
+      if (!supabase) return { ok: false, message: 'Chưa kết nối máy chủ.' };
+      return callRpc('app_ip_allow', { p_token: getSessionToken(), p_ip: ip });
+  },
+
+  ipDebug: async (): Promise<{ ok: boolean; message?: string; ip?: string; rep?: { checked: boolean; bad?: boolean; kind?: string; org?: string; error?: string } }> => {
+      if (!supabase) return { ok: false, message: 'Chưa kết nối máy chủ.' };
+      return callRpc('app_ip_debug', { p_token: getSessionToken() });
+  },
+
   getQrKey: async (sessionId: string): Promise<{ ok: boolean; message?: string; secret?: string; offset?: number; stepMs?: number }> => {
       if (supabase) {
           const t0 = Date.now();
