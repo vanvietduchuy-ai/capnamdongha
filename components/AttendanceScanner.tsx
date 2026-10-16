@@ -2,9 +2,12 @@ import React, { useState, useEffect, useRef } from 'react';
 import { MockDB } from '../services/mockDatabase';
 import { parseOfficerQr } from '../lib/qrCode';
 import { QrScanEngine, EngineInfo, listCameras } from '../lib/qrScanEngine';
-import { ScanLine, Camera, SwitchCamera, AlertCircle, Loader2, ZoomIn } from 'lucide-react';
-import { User } from '../types';
+import { ScanLine, Camera, SwitchCamera, AlertCircle, Loader2, ZoomIn, UserCheck, RotateCcw } from 'lucide-react';
+import { User, CheckInFace } from '../types';
 import { Button, ResultMark, haptic } from './UI';
+import { FaceCapture, FaceOutcome } from './FaceCapture';
+import { getDeviceId, getFingerprint } from '../lib/deviceFingerprint';
+import { FACE_RESULT_TTL } from '../lib/faceCheck';
 
 interface AttendanceScannerProps {
   currentUser: User;
@@ -30,7 +33,6 @@ export const AttendanceScanner: React.FC<AttendanceScannerProps> = ({ currentUse
   const [showHint, setShowHint] = useState(false);
 
   const [deviceId, setDeviceId] = useState<string>('');
-  const [ipAddress, setIpAddress] = useState<string>('');
   const [isSystemReady, setIsSystemReady] = useState(false);
   // Dùng ref để hàm xử lý quét luôn đọc giá trị mới nhất và chặn xử lý trùng lặp
   const systemReadyRef = useRef(false);
@@ -41,84 +43,35 @@ export const AttendanceScanner: React.FC<AttendanceScannerProps> = ({ currentUse
   const initialPinchDistance = useRef<number | null>(null);
   const initialZoomOnPinchStart = useRef<number>(1);
 
-  // Enhanced Fingerprinting to prevent Incognito/Multi-browser fraud
-  const generateFingerprint = () => {
-    try {
-        // 1. Orientation-independent screen resolution
-        // This ensures portrait/landscape modes on mobile produce the same fingerprint
-        const width = Math.max(screen.width, screen.height);
-        const height = Math.min(screen.width, screen.height);
-        
-        // 2. Timezone
-        const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-        
-        // 3. Language (base language)
-        const lang = navigator.language ? navigator.language.split('-')[0] : 'unknown';
+  // Chụp khuôn mặt trước khi quét mã (file SQL 11). 'off' = máy chủ tắt hoặc chưa cập nhật
+  const [faceMode, setFaceMode] = useState<'flag' | 'strict' | 'off'>('off');
+  const [face, setFace] = useState<FaceOutcome | null>(null);
+  const faceRef = useRef<FaceOutcome | null>(null);
+  useEffect(() => { faceRef.current = face; }, [face]);
+  const [showFace, setShowFace] = useState(false);
+  const [faceAgain, setFaceAgain] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
 
-        const components = [
-            `${width}x${height}`, 
-            screen.colorDepth,
-            timezone,
-            lang,
-            navigator.platform, // OS Platform
-            (navigator as any).hardwareConcurrency || 'unknown',
-            (navigator as any).deviceMemory || 'unknown',
-            (navigator as any).maxTouchPoints || 0
-        ];
-
-        // Simple hash function
-        const str = components.join('||');
-        let hash = 0;
-        for (let i = 0; i < str.length; i++) {
-            const char = str.charCodeAt(i);
-            hash = ((hash << 5) - hash) + char;
-            hash = hash & hash;
-        }
-        
-        return 'fp_' + Math.abs(hash).toString(16);
-    } catch (e) {
-        // Fallback if fingerprinting fails
-        console.error("Fingerprint error", e);
-        return `dev_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    }
-  };
-
-  // Unique Device ID logic
-  const getPersistentDeviceId = () => {
-    try {
-        let id = localStorage.getItem('attendance_device_id');
-        if (!id) {
-            // Generate a more unique ID: random + timestamp + fingerprint hint
-            const random = Math.random().toString(36).substring(2, 11);
-            const timestamp = Date.now().toString(36);
-            id = `device_${timestamp}_${random}`;
-            localStorage.setItem('attendance_device_id', id);
-        }
-        return id;
-    } catch (e) {
-        return `temp_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
-    }
-  };
+  const faceFresh = (f: FaceOutcome | null) => !!f && ('none' in f || Date.now() - f.at < FACE_RESULT_TTL);
 
   useEffect(() => {
-    setDeviceId(getPersistentDeviceId());
-    // Lấy IP để ghi nhật ký (không chặn giao diện)
+    setDeviceId(getDeviceId());
     (async () => {
       try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 3000);
-        const res = await fetch('https://api.ipify.org?format=json', { signal: controller.signal });
-        const data = await res.json();
-        setIpAddress(data.ip);
-        clearTimeout(timeoutId);
-      } catch (err) {
-        console.warn('IP fetch failed', err);
-      } finally {
-        setIsSystemReady(true);
-      }
+        const cfg = await MockDB.getCheckinConfig();
+        setFaceMode(cfg.faceMode);
+      } catch { /* mặc định không chụp mặt */ }
+      finally { setIsSystemReady(true); }
     })();
     return () => { engineRef.current?.stop(); engineRef.current = null; };
   }, []);
+
+  /** Bấm "Bắt đầu": chụp mặt trước (nếu cần) rồi mới mở camera sau để quét mã */
+  const begin = () => {
+    setError(null); setFaceAgain(false);
+    if (faceMode !== 'off' && !faceFresh(face)) { setFace(null); setShowFace(true); return; }
+    startScanning();
+  };
 
   // Gợi ý phóng to nếu quét 5 giây chưa thấy mã
   useEffect(() => {
@@ -243,15 +196,32 @@ export const AttendanceScanner: React.FC<AttendanceScannerProps> = ({ currentUse
           return;
       }
 
-      const currentDeviceId = deviceId || localStorage.getItem('attendance_device_id') || `unknown_${Date.now()}`;
-      const currentFingerprint = generateFingerprint();
+      const currentDeviceId = deviceId || getDeviceId();
+      const currentFingerprint = getFingerprint();
 
-      const result = await MockDB.checkIn(currentUser.id, currentDeviceId, session.id, ipAddress, currentFingerprint, decodedText.trim());
+      // Kết quả chụp mặt
+      let facePayload: CheckInFace | null = null;
+      const f = faceRef.current;
+      if (faceMode !== 'off') {
+          if (!faceFresh(f)) {
+              setFace(null); setFaceAgain(true);
+              setError('Ảnh chụp khuôn mặt đã quá 3 phút. Bấm "Chụp lại khuôn mặt" rồi quét mã.');
+              return;
+          }
+          facePayload = f && 'none' in f
+              ? { method: 'none', reason: f.reason }
+              : f ? { descriptor: f.descriptor, photo: f.photo, live: f.live, method: f.method } : null;
+      }
+
+      const result = await MockDB.checkIn(currentUser.id, currentDeviceId, session.id, undefined, currentFingerprint, decodedText.trim(), facePayload);
       if (result.success) {
           haptic(60);
           setScanResult(`Điểm danh thành công: ${session.title}`);
-          setTimeout(onSuccess, 3000);
+          setNote(result.enrolled ? 'Ảnh khuôn mặt lần này được lưu làm ảnh mẫu của tài khoản, Ban tổ chức sẽ xác nhận.' : null);
+          setFace(null);
+          setTimeout(onSuccess, result.enrolled ? 5000 : 3000);
       } else {
+          if (result.faceRejected) { setFace(null); setFaceAgain(true); }
           setError(result.message);
       }
     } catch (err) {
@@ -268,7 +238,13 @@ export const AttendanceScanner: React.FC<AttendanceScannerProps> = ({ currentUse
 
   return (
     <div className="max-w-md mx-auto space-y-3" data-testid="scanner">
-      {!isScanning && !scanResult && (
+      {showFace && (
+        <FaceCapture mode={faceMode === 'strict' ? 'strict' : 'flag'}
+          onCancel={() => setShowFace(false)}
+          onDone={(r) => { setFace(r); faceRef.current = r; setShowFace(false); window.setTimeout(() => startScanning(), 60); }} />
+      )}
+
+      {!showFace && !isScanning && !scanResult && (
         <div className="bg-white rounded-xl border border-stone-200 p-5 md:p-6">
           <div className="icon-3d w-12 h-12 rounded-[14px] flex items-center justify-center mb-4" style={{ ['--c' as any]: '#0f766e' }}><ScanLine className="w-6 h-6" /></div>
           <h2 className="text-lg font-semibold text-stone-900">Quét mã điểm danh</h2>
@@ -278,9 +254,20 @@ export const AttendanceScanner: React.FC<AttendanceScannerProps> = ({ currentUse
             <li className="flex gap-2"><span className="w-5 h-5 mt-px rounded-full bg-stone-100 text-stone-600 text-xs font-semibold flex items-center justify-center shrink-0">3</span><span>Ngồi xa thì bấm <b className="font-semibold text-stone-800">2×</b> hoặc <b className="font-semibold text-stone-800">4×</b> để phóng to.</span></li>
           </ol>
           <div className="mt-5 space-y-2">
-            <Button onClick={() => { setError(null); startScanning(); }} disabled={!isSystemReady} size="lg" className="w-full" icon={isSystemReady ? <Camera className="w-5 h-5" /> : <Loader2 className="w-5 h-5 animate-spin" />}>
-              {isSystemReady ? 'Bắt đầu quét' : 'Đang chuẩn bị...'}
+            {faceMode !== 'off' && (
+              <div className={`flex items-center gap-2 text-[13px] px-3 py-2 rounded-lg ${faceFresh(face) ? 'bg-emerald-50 text-emerald-800' : 'bg-stone-50 text-stone-600'}`}>
+                <UserCheck className="w-4 h-4 shrink-0" />
+                {faceFresh(face)
+                  ? (face && 'none' in face ? 'Gửi không có ảnh khuôn mặt — Ban tổ chức sẽ kiểm tra.' : 'Đã chụp khuôn mặt. Quét mã QR để hoàn tất.')
+                  : 'Trước khi quét mã, phần mềm sẽ chụp khuôn mặt bằng camera trước.'}
+              </div>
+            )}
+            <Button onClick={begin} disabled={!isSystemReady} size="lg" className="w-full" icon={isSystemReady ? <Camera className="w-5 h-5" /> : <Loader2 className="w-5 h-5 animate-spin" />}>
+              {!isSystemReady ? 'Đang chuẩn bị...' : faceMode !== 'off' && !faceFresh(face) ? 'Bắt đầu (chụp mặt → quét mã)' : 'Bắt đầu quét'}
             </Button>
+            {faceAgain && faceMode !== 'off' && (
+              <Button onClick={() => { setError(null); setFace(null); setFaceAgain(false); setShowFace(true); }} variant="secondary" size="lg" className="w-full" icon={<RotateCcw className="w-5 h-5" />}>Chụp lại khuôn mặt</Button>
+            )}
           </div>
         </div>
       )}
@@ -297,6 +284,7 @@ export const AttendanceScanner: React.FC<AttendanceScannerProps> = ({ currentUse
           <div className="result-text">
             <p className="text-lg font-semibold text-stone-900">Đã điểm danh</p>
             <p className="text-sm text-stone-700 mt-1">{scanResult}</p>
+            {note && <p className="text-xs text-stone-600 mt-2 px-2">{note}</p>}
             <p className="text-xs text-stone-500 mt-2">Đang quay về trang chủ...</p>
           </div>
         </div>

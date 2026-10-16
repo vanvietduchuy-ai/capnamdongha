@@ -10,12 +10,13 @@ import { Portal } from './Portal';
 import { SkeletonList, BumpNumber } from './UI';
 import { SeatMap, SeatLegend, PersonIcon } from './SeatMap';
 import { SeatingManager } from './SeatingManager';
+import { CheckInReview } from './CheckInReview';
 import { seatStateFactory, seatingStats } from '../lib/seating';
 import { guestUrl, officerPayload, signSlot } from '../lib/qrCode';
 import { LOGO_URL, ORG_NAME } from '../lib/brand';
 import {
   Plus, CalendarPlus, CalendarClock, Timer, MapPin, Users as UsersIcon, Play, Pencil, Trash2, QrCode, UserPlus, Square,
-  FileText, RotateCcw, X, ChevronLeft, ChevronRight, Maximize2, FileDown, Sheet as SheetIcon, CheckCircle2, LayoutGrid, AlertTriangle
+  FileText, RotateCcw, X, ChevronLeft, ChevronRight, Maximize2, FileDown, Sheet as SheetIcon, CheckCircle2, LayoutGrid, AlertTriangle, ShieldAlert
 } from 'lucide-react';
 import { backdropClose } from '../lib/backdrop';
 
@@ -586,6 +587,8 @@ export const MeetingManager: React.FC<Props> = ({ currentUser }) => {
                 </div>
               </>);
             })()}
+            <h4 className="mt-5 mb-2 text-[13px] font-semibold text-stone-900 inline-flex items-center gap-1.5"><ShieldAlert className="w-4 h-4 text-amber-600" />Kiểm tra chống điểm danh hộ</h4>
+            <CheckInReview sessionId={resultSession.id} records={k.recs} userMap={userMap} />
             <p className="mt-3 text-xs text-stone-500">Ghi lý do vắng (có lý do / không lý do) ở thẻ <b>Báo cáo vắng</b> trước khi xuất báo cáo chính thức.</p>
             <button onClick={() => { setResultId(null); askStart(resultSession); }} className="mt-3 inline-flex items-center gap-1.5 text-[13px] font-medium text-stone-600 hover:text-stone-900"><RotateCcw className="w-3.5 h-3.5" />Mở lại điểm danh</button>
           </Sheet>
@@ -631,7 +634,8 @@ const LivePanel: React.FC<{
 }> = ({ session, now, st, userMap, layout, flags, absences, onFlag, onClose, onEnd, onExtend, onAdd, ending }) => {
   const [mode, setMode] = useState<'OFFICER' | 'GUEST'>('OFFICER');
   const [qr, setQr] = useState('');
-  const [tab, setTab] = useState<'ABSENT' | 'PRESENT' | 'SEATS'>(layout ? 'SEATS' : 'ABSENT');
+  const [tab, setTab] = useState<'ABSENT' | 'PRESENT' | 'SEATS' | 'CHECK'>(layout ? 'SEATS' : 'ABSENT');
+  const pendingCheck = st.recs.filter(r => r.reviewStatus === 'PENDING').length;
   const [pickSeat, setPickSeat] = useState<Seat | null>(null);
   const seatState = useMemo(() => seatStateFactory(session, st.recs, absences, flags), [session, st.recs, absences, flags]);
   const sStats = useMemo(() => seatingStats(session, layout, st.recs, absences, flags), [session, layout, st.recs, absences, flags]);
@@ -831,8 +835,11 @@ const LivePanel: React.FC<{
               {layout && <button onClick={() => setTab('SEATS')} data-testid="tab-seats" className={`flex-1 h-8 text-[13px] rounded-md ${tab === 'SEATS' ? 'bg-white text-stone-900 font-semibold shadow-sm' : 'text-stone-600'}`}>Sơ đồ</button>}
               <button onClick={() => setTab('ABSENT')} className={`flex-1 h-8 text-[13px] rounded-md ${tab === 'ABSENT' ? 'bg-white text-stone-900 font-semibold shadow-sm' : 'text-stone-600'}`}>Chưa điểm danh ({st.absent.length})</button>
               <button onClick={() => setTab('PRESENT')} className={`flex-1 h-8 text-[13px] rounded-md ${tab === 'PRESENT' ? 'bg-white text-stone-900 font-semibold shadow-sm' : 'text-stone-600'}`}>Đã điểm danh ({st.recs.length})</button>
+              <button onClick={() => setTab('CHECK')} data-testid="tab-check" className={`flex-1 h-8 text-[13px] rounded-md ${tab === 'CHECK' ? 'bg-white text-stone-900 font-semibold shadow-sm' : pendingCheck ? 'text-amber-700 font-semibold' : 'text-stone-600'}`}>Kiểm tra{pendingCheck ? ` (${pendingCheck})` : ''}</button>
             </div>
-            {tab === 'SEATS' && layout ? (
+            {tab === 'CHECK' ? (
+              <div className="bg-white rounded-xl border border-stone-200 p-3"><CheckInReview sessionId={session.id} records={st.recs} userMap={userMap} /></div>
+            ) : tab === 'SEATS' && layout ? (
               <div className="bg-white rounded-xl border border-stone-200 p-2.5" data-testid="live-seats">
                 <div className="flex items-center justify-between mb-2 px-0.5">
                   <span className="text-xs text-stone-500">Chạm ghế để đối sánh tại chỗ</span>
@@ -876,6 +883,7 @@ const LivePanel: React.FC<{
                         <div className="text-sm font-medium text-stone-900 truncate">{guest ? r.guestName : (u?.fullName || r.userId)}
                           {guest && <span className="ml-1 text-[10px] font-medium text-sky-800 bg-sky-50 px-1.5 py-0.5 rounded">khách</span>}
                           {outside && <span className="ml-1 text-[10px] font-medium text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded">ngoài DS</span>}
+                          {r.reviewStatus === 'PENDING' && <button onClick={() => setTab('CHECK')} className="ml-1 text-[10px] font-medium text-amber-900 bg-amber-100 px-1.5 py-0.5 rounded">cần kiểm tra</button>}
                         </div>
                         <div className="text-[11px] text-stone-400 truncate">{guest ? (r.guestUnit || 'Khách mời') : (u?.department || '')}</div>
                       </div>
