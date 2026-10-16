@@ -443,11 +443,15 @@ BEGIN
   END IF;
 
   -- ---------- (2) Cùng 1 máy, khác trình duyệt ----------
+  -- Cùng dòng máy + cùng Wi-Fi (hoặc cùng IP 4G do nhà mạng dùng chung) cũng cho dấu vân tay
+  -- và IP giống nhau → nếu 2 khuôn mặt KHÁC RÕ (đều có ảnh) thì là 2 người thật, không gắn cờ.
   IF v_fp IS NOT NULL AND v_ip IS NOT NULL THEN
     FOR v_other IN
-      SELECT id, "userId" FROM attendance_records
-       WHERE "sessionId" = s.id AND "userId" <> actor.id AND "guestName" IS NULL
-         AND fingerprint = v_fp AND "serverIp" = v_ip AND "timestamp" > v_now - 15 * 60000
+      SELECT r.id, r."userId" FROM attendance_records r
+        LEFT JOIN attendance_evidence e ON e."recordId" = r.id
+       WHERE r."sessionId" = s.id AND r."userId" <> actor.id AND r."guestName" IS NULL
+         AND r.fingerprint = v_fp AND r."serverIp" = v_ip AND r."timestamp" > v_now - 15 * 60000
+         AND NOT (v_desc IS NOT NULL AND e.descriptor IS NOT NULL AND face_dist(e.descriptor, v_desc) > v_ok)
     LOOP
       v_flags := v_flags || jsonb_build_array(jsonb_build_object('code', 'SAME_DEVICE', 'ref', v_other."userId", 'refName', user_name(v_other."userId")));
       v_heavy := true;
