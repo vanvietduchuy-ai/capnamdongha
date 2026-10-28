@@ -16,6 +16,8 @@
 --             Phải đăng nhập — máy chủ ghi đúng tên người báo, không báo hộ được.
 --  TRÁCH NHIỆM: mỗi lần nộp là một phiên bản, KHÔNG sửa/xoá được bản đã nộp.
 --             Sửa = nộp bản mới; sau hạn nộp phải ghi lý do đính chính. Lưu đủ lịch sử.
+--             Người quản lý (chỉ huy, Tổ Tổng hợp, người được cấp quyền) và tổ trưởng/tổ phó được SỬA HỘ báo cáo của cán bộ khi kỳ CHƯA CHỐT
+--             (chưa quá hạn nộp): vẫn giữ tên người báo gốc, ghi thêm người chỉnh sửa; sau hạn nộp (kỳ đã chốt) không sửa hộ được.
 --  BẢO MẬT:   Mọi bảng của báo cáo ngày KHÔNG đọc/ghi trực tiếp được; chỉ qua hàm có kiểm tra quyền.
 --             Không nhập số định danh (CCCD), số điện thoại; thông tin đối tượng chỉ ghi họ tên, năm sinh, nơi ở.
 -- =====================================================================
@@ -47,6 +49,8 @@ ALTER TABLE daily_reports ADD COLUMN IF NOT EXISTS late           boolean DEFAUL
 ALTER TABLE daily_reports ADD COLUMN IF NOT EXISTS reason         text;     -- lý do đính chính (sau hạn)
 ALTER TABLE daily_reports ADD COLUMN IF NOT EXISTS confirmed      boolean DEFAULT true;
 ALTER TABLE daily_reports ADD COLUMN IF NOT EXISTS device         text;
+ALTER TABLE daily_reports ADD COLUMN IF NOT EXISTS "editorId"     text;     -- người quản lý / tổ trưởng chỉnh sửa hộ nội dung (kỳ chưa chốt)
+ALTER TABLE daily_reports ADD COLUMN IF NOT EXISTS "editorName"   text;
 CREATE INDEX IF NOT EXISTS idx_daily_reports_day ON daily_reports (day, unit, active);
 -- Mỗi (ngày, đầu mối) chỉ 1 phiên bản đang hiệu lực (chống 2 người nộp cùng lúc)
 CREATE UNIQUE INDEX IF NOT EXISTS uq_daily_reports_active ON daily_reports (day, unit) WHERE active;
@@ -196,6 +200,16 @@ BEGIN
 END;
 $$;
 
+-- Sửa nội dung báo cáo của cán bộ khác: người quản lý (ADMIN, chỉ huy, Tổ Tổng hợp, người được cấp quyền) hoặc tổ trưởng / tổ phó
+-- của tổ đó; CHỈ khi đã có báo cáo và kỳ CHƯA CHỐT (chưa quá hạn nộp). Sau hạn nộp = đã chốt, không sửa hộ được nữa.
+CREATE OR REPLACE FUNCTION daily_can_edit(u users, p_day date, p_unit text) RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
+  SELECT u.id IS NOT NULL AND coalesce(u."isApproved", true)
+     AND (can_manage_daily(u) OR daily_is_leader(u, p_unit))
+     AND now() <= daily_deadline_at(p_day)
+     AND EXISTS (SELECT 1 FROM daily_reports r WHERE r.day = p_day AND r.unit = p_unit AND r.active)
+$$;
+
 CREATE OR REPLACE FUNCTION daily_uname(p_id text) RETURNS text
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public AS $$
   SELECT "fullName" FROM users WHERE id = p_id
@@ -294,7 +308,7 @@ BEGIN
     END IF;
   END LOOP;
   RETURN jsonb_build_object('ok', true,
-    'v', 5,                         -- phiên bản hàm máy chủ (ứng dụng dùng để phát hiện máy chủ chưa cập nhật)
+    'v', 6,                         -- phiên bản hàm máy chủ (ứng dụng dùng để phát hiện máy chủ chưa cập nhật)
     'currentDay', d,
     'deadline', to_char(daily_deadline_time(), 'HH24:MI'),
     'deadlineAt', (extract(epoch FROM daily_deadline_at(d)) * 1000)::bigint,
@@ -312,14 +326,15 @@ $$;
 -- Mở biểu mẫu báo cáo của 1 đầu mối, 1 ngày
 CREATE OR REPLACE FUNCTION app_daily_get(p_token text, p_day date, p_unit text)
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions AS $$
-DECLARE actor users%ROWTYPE; v_role text; mgr boolean; others jsonb;
+DECLARE actor users%ROWTYPE; v_role text; mgr boolean; others jsonb; v_edit boolean;
 BEGIN
   actor := session_user_row(p_token);
   IF actor.id IS NULL THEN RETURN expired_msg(); END IF;
   IF NOT (p_unit = ANY (daily_units())) THEN RETURN err('Đầu mối báo cáo không hợp lệ.'); END IF;
   v_role := daily_role(actor, p_day, p_unit);
   mgr := can_manage_daily(actor);
-  IF v_role IS NULL AND NOT mgr THEN RETURN err('Tài khoản này không dùng để báo cáo ngày.'); END IF;
+  v_edit := daily_can_edit(actor, p_day, p_unit);
+  IF v_role IS NULL AND NOT mgr AND NOT v_edit THEN RETURN err('Tài khoản này không dùng để báo cáo ngày.'); END IF;
   -- Vụ việc các đầu mối khác đã báo cùng ngày (tóm tắt, để chọn "trùng với vụ đã có")
   SELECT coalesce(jsonb_agg(jsonb_build_object('key', i.key, 'unit', i.unit, 'unitName', daily_unit_name(i.unit), 'field', i.field,
            'location', i.location, 'occurredAt', i."occurredAt", 'summary', left(i.summary, 200)) ORDER BY i.unit, i.ord), '[]'::jsonb)
@@ -330,7 +345,7 @@ BEGIN
            'field', f.data->>'field', 'location', f.data->>'location', 'occurredAt', f.data->>'occurredAt', 'summary', left(f.data->>'summary', 200), 'flash', true))
       FROM daily_flash f WHERE f.day = p_day AND f.unit <> p_unit
        AND NOT EXISTS (SELECT 1 FROM daily_incidents i JOIN daily_reports r ON r.id = i."reportId" WHERE r.active AND i.key = f.key)), '[]'::jsonb);
-  RETURN jsonb_build_object('ok', true, 'role', v_role, 'canSubmit', v_role IS NOT NULL,
+  RETURN jsonb_build_object('ok', true, 'role', v_role, 'canSubmit', v_role IS NOT NULL OR v_edit, 'canEdit', v_edit,
     'day', p_day, 'currentDay', daily_current_day(),
     'deadlineAt', (extract(epoch FROM daily_deadline_at(p_day)) * 1000)::bigint,
     'periodFrom', (extract(epoch FROM daily_deadline_at(p_day - 1)) * 1000)::bigint,
@@ -344,24 +359,34 @@ CREATE OR REPLACE FUNCTION app_daily_submit(p_token text, p_day date, p_unit tex
                                             p_incidents jsonb, p_reason text, p_confirm boolean, p_device text)
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions AS $$
 DECLARE actor users%ROWTYPE; v_role text; cur date; old daily_reports%ROWTYPE; v_id text; v_ver int;
-        v_late boolean; it jsonb; bad text; n int := 0; v_key text;
+        v_late boolean; it jsonb; bad text; n int := 0; v_key text; v_edit boolean;
 BEGIN
   actor := session_user_row(p_token);
   IF actor.id IS NULL THEN RETURN expired_msg(); END IF;
   IF NOT (p_unit = ANY (daily_units())) THEN RETURN err('Đầu mối báo cáo không hợp lệ.'); END IF;
   v_role := daily_role(actor, p_day, p_unit);
-  IF v_role IS NULL THEN RETURN err('Tài khoản này không dùng để báo cáo ngày (tài khoản quản trị hoặc chưa được duyệt).'); END IF;
+  -- Người quản lý / tổ trưởng sửa hộ báo cáo của cán bộ khác: chỉ khi kỳ chưa chốt (chưa quá hạn nộp), ghi rõ người sửa
+  SELECT * INTO old FROM daily_reports WHERE day = p_day AND unit = p_unit AND active ORDER BY version DESC LIMIT 1 FOR UPDATE;
+  v_edit := old.id IS NOT NULL AND old."reporterId" IS DISTINCT FROM actor.id AND daily_can_edit(actor, p_day, p_unit);
+  IF v_role IS NULL AND NOT v_edit THEN
+    IF old.id IS NOT NULL AND now() > daily_deadline_at(p_day) AND (can_manage_daily(actor) OR daily_is_leader(actor, p_unit)) THEN
+      RETURN jsonb_build_object('ok', false, 'code', 'PERIOD_CLOSED',
+        'message', 'Kỳ báo cáo ngày ' || to_char(p_day, 'DD/MM/YYYY') || ' đã chốt lúc ' ||
+                   to_char(daily_deadline_at(p_day) AT TIME ZONE 'Asia/Ho_Chi_Minh', 'HH24:MI "ngày" DD/MM') || ', không thể sửa nội dung báo cáo của cán bộ.');
+    END IF;
+    RETURN err('Tài khoản này không dùng để báo cáo ngày (tài khoản quản trị hoặc chưa được duyệt).');
+  END IF;
   cur := daily_current_day();
-  IF p_day > cur THEN RETURN err('Chưa đến kỳ báo cáo ngày ' || to_char(p_day, 'DD/MM/YYYY') || '.'); END IF;
+  IF NOT v_edit AND p_day > cur THEN RETURN err('Chưa đến kỳ báo cáo ngày ' || to_char(p_day, 'DD/MM/YYYY') || '.'); END IF;
   -- Chưa đến giờ mở kỳ: không nhận, tránh báo cáo trễ của kỳ vừa đóng bị tính sang kỳ mới
-  IF now() < daily_open_at(p_day) THEN
+  IF NOT v_edit AND now() < daily_open_at(p_day) THEN
     RETURN jsonb_build_object('ok', false, 'code', 'NOT_OPEN',
       'message', 'Kỳ báo cáo ngày ' || to_char(p_day, 'DD/MM/YYYY') || ' chưa mở. Nhận báo cáo từ ' ||
                  to_char(daily_open_at(p_day) AT TIME ZONE 'Asia/Ho_Chi_Minh', 'HH24:MI "ngày" DD/MM') || ' đến ' ||
                  to_char(daily_deadline_at(p_day) AT TIME ZONE 'Asia/Ho_Chi_Minh', 'HH24:MI "ngày" DD/MM') ||
                  '. Nếu đang báo cáo tình hình kỳ vừa đóng (ngày ' || to_char(p_day - 1, 'DD/MM') || '), chọn mục "Nộp bù".');
   END IF;
-  IF p_day < cur - get_setting('daily_late_days', '7')::int THEN RETURN err('Đã quá thời hạn nộp bù cho ngày này. Liên hệ Tổ Tổng hợp.'); END IF;
+  IF NOT v_edit AND p_day < cur - get_setting('daily_late_days', '7')::int THEN RETURN err('Đã quá thời hạn nộp bù cho ngày này. Liên hệ Tổ Tổng hợp.'); END IF;
   IF coalesce(p_confirm, false) IS NOT TRUE THEN RETURN err('Cần đánh dấu xác nhận chịu trách nhiệm về nội dung báo cáo.'); END IF;
   IF p_status NOT IN ('NORMAL', 'INCIDENT') THEN RETURN err('Trạng thái báo cáo không hợp lệ.'); END IF;
   p_incidents := jarr(p_incidents);
@@ -379,7 +404,6 @@ BEGIN
   IF length(coalesce(p_note, '')) > 3000 THEN RETURN err('Phần tình hình chung quá dài (tối đa 3.000 ký tự).'); END IF;
   IF coalesce(p_note, '') ~ '(^|\D)0\d{8,11}(\D|$)' THEN RETURN err('Phần tình hình chung có dãy số giống số định danh/điện thoại — không nhập thông tin định danh.'); END IF;
 
-  SELECT * INTO old FROM daily_reports WHERE day = p_day AND unit = p_unit AND active ORDER BY version DESC LIMIT 1 FOR UPDATE;
   v_late := now() > daily_deadline_at(p_day);
   IF old.id IS NOT NULL AND v_late AND length(trim(coalesce(p_reason, ''))) < 5 THEN
     RETURN err('Đã qua hạn nộp: muốn đính chính phải ghi lý do.');
@@ -387,10 +411,15 @@ BEGIN
   v_ver := coalesce((SELECT max(version) FROM daily_reports WHERE day = p_day AND unit = p_unit), 0) + 1;
   UPDATE daily_reports SET active = false WHERE day = p_day AND unit = p_unit AND active;
   v_id := new_id('dr');
+  -- Sửa hộ: giữ nguyên người báo cáo gốc, ghi thêm người chỉnh sửa
   INSERT INTO daily_reports (id, day, unit, version, active, status, note, "reporterId", "reporterName", "reporterRole",
-                             "submittedAt", late, reason, confirmed, device)
-  VALUES (v_id, p_day, p_unit, v_ver, true, p_status, nullif(trim(coalesce(p_note, '')), ''), actor.id, actor."fullName", v_role,
-          now_ms(), v_late, nullif(trim(coalesce(p_reason, '')), ''), true, left(p_device, 200));
+                             "submittedAt", late, reason, confirmed, device, "editorId", "editorName")
+  VALUES (v_id, p_day, p_unit, v_ver, true, p_status, nullif(trim(coalesce(p_note, '')), ''),
+          CASE WHEN v_edit THEN old."reporterId" ELSE actor.id END,
+          CASE WHEN v_edit THEN old."reporterName" ELSE actor."fullName" END,
+          CASE WHEN v_edit THEN old."reporterRole" ELSE v_role END,
+          now_ms(), v_late, nullif(trim(coalesce(p_reason, '')), ''), true, left(p_device, 200),
+          CASE WHEN v_edit THEN actor.id END, CASE WHEN v_edit THEN actor."fullName" END);
   n := 0;
   FOR it IN SELECT * FROM jsonb_array_elements(p_incidents) LOOP
     n := n + 1;
@@ -449,19 +478,22 @@ $$;
 -- Bảng theo dõi 1 ngày (chỉ huy, Tổ Tổng hợp; tổ trưởng xem được đầu mối tổ mình)
 CREATE OR REPLACE FUNCTION app_daily_board(p_token text, p_day date)
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions AS $$
-DECLARE actor users%ROWTYPE; mgr boolean; u text; units jsonb := '[]'::jsonb;
+DECLARE actor users%ROWTYPE; mgr boolean; u text; units jsonb := '[]'::jsonb; edits jsonb := '[]'::jsonb;
 BEGIN
   actor := session_user_row(p_token);
   IF actor.id IS NULL THEN RETURN expired_msg(); END IF;
   mgr := can_manage_daily(actor);
   FOREACH u IN ARRAY daily_units() LOOP
-    IF mgr OR daily_is_leader(actor, u) THEN units := units || daily_unit_json(p_day, u); END IF;
+    IF mgr OR daily_is_leader(actor, u) THEN
+      units := units || daily_unit_json(p_day, u);
+      IF daily_can_edit(actor, p_day, u) THEN edits := edits || to_jsonb(u); END IF;
+    END IF;
   END LOOP;
   IF jsonb_array_length(units) = 0 THEN RETURN err('Bạn không có quyền xem bảng theo dõi báo cáo ngày.'); END IF;
   RETURN jsonb_build_object('ok', true, 'day', p_day, 'currentDay', daily_current_day(), 'canManage', mgr,
     'deadlineAt', (extract(epoch FROM daily_deadline_at(p_day)) * 1000)::bigint,
     'periodFrom', (extract(epoch FROM daily_deadline_at(p_day - 1)) * 1000)::bigint,
-    'units', units,
+    'units', units, 'editUnits', edits, 'closed', now() > daily_deadline_at(p_day),
     'dups', CASE WHEN mgr THEN coalesce((SELECT jsonb_object_agg(key, coalesce("dupOf", '')) FROM daily_dups WHERE day = p_day), '{}'::jsonb) ELSE '{}'::jsonb END);
 END;
 $$;

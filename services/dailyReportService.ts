@@ -94,12 +94,13 @@ export interface DailyMe {
   canManage: boolean; leaderOf: DailyUnit[]; mine: DailyMine[];
 }
 export interface DailyGet {
-  role: string | null; canSubmit: boolean; day: string; currentDay: string; deadlineAt: number; periodFrom: number; openAt?: number;
+  role: string | null; canSubmit: boolean; canEdit?: boolean; day: string; currentDay: string; deadlineAt: number; periodFrom: number; openAt?: number;
   unitInfo: DailyUnitInfo; others: DailyOtherIncident[];
 }
 export interface DailyBoard {
   day: string; currentDay: string; canManage: boolean; deadlineAt: number; periodFrom: number;
   units: DailyUnitInfo[]; dups: Record<string, string>;
+  editUnits?: DailyUnit[]; closed?: boolean;   // đầu mối được sửa hộ báo cáo (kỳ chưa chốt) — máy chủ bản 6 trở lên
 }
 export interface DailyRangeReport {
   id: string; day: string; unit: DailyUnit; status: DailyStatus; note?: string | null;
@@ -148,7 +149,7 @@ export const Daily = {
     callRpc<{ key: string; day: string }>('app_daily_flash', { p_token: tok(), p_unit: unit, p_incident: cleanIncident(inc) }),
   board: async (day: string): R<Partial<DailyBoard>> => {
     const r = await callRpc<any>('app_daily_board', { p_token: tok(), p_day: day });
-    return { ...r, units: arr<any>(r.units).map(normUnit), dups: r.dups || {},
+    return { ...r, units: arr<any>(r.units).map(normUnit), dups: r.dups || {}, editUnits: arr<DailyUnit>(r.editUnits),
       deadlineAt: Number(r.deadlineAt) || 0, periodFrom: Number(r.periodFrom) || 0 };
   },
   history: async (day: string, unit: DailyUnit): R<{ versions: DailyReport[] }> => {

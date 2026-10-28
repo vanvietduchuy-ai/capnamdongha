@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { BellRing, ChevronLeft, ChevronRight, FileText, History, Loader2, RefreshCw, Siren } from 'lucide-react';
+import { BellRing, ChevronLeft, ChevronRight, FileText, History, Loader2, Pencil, RefreshCw, Siren } from 'lucide-react';
 import { DailyIncident, DailyReport, DailyUnit } from '../../types';
 import {
   addDays, boardIncidents, Daily, DailyBoard as Board, dayText, dupTarget, exportDailyWord, ROLE_TEXT, Signer, totalsByField, unitName, vnDateTime, vnTime, weekdayText
@@ -7,14 +7,14 @@ import {
 import { btnPrimary, btnSecondary, card, Chip, inputCls, labelCls, Sheet } from '../learning/common';
 import { IncidentView } from './DailyForm';
 
-interface Props { initialDay: string; deadline: string; }
+interface Props { initialDay: string; deadline: string; onEdit?: (unit: DailyUnit, day: string) => void; }
 
 const SIGNER_KEY = 'daily_signer';
 export const loadSigner = (): Signer => { try { return JSON.parse(localStorage.getItem(SIGNER_KEY) || '') as Signer; } catch { return { chucDanh: 'TRƯỞNG CÔNG AN PHƯỜNG', hoTen: '' }; } };
 const saveSigner = (s: Signer) => { try { localStorage.setItem(SIGNER_KEY, JSON.stringify(s)); } catch { /* bỏ qua */ } };
 
 /** Bảng theo dõi báo cáo ngày (chỉ huy, Tổ Tổng hợp; tổ trưởng xem tổ mình) */
-export const DailyBoardView: React.FC<Props> = ({ initialDay, deadline }) => {
+export const DailyBoardView: React.FC<Props> = ({ initialDay, deadline, onEdit }) => {
   const [day, setDay] = useState(initialDay);
   const [b, setB] = useState<Partial<Board> | null>(null);
   const [err, setErr] = useState('');
@@ -70,7 +70,9 @@ export const DailyBoardView: React.FC<Props> = ({ initialDay, deadline }) => {
         {day !== current && <button className={btnSecondary} onClick={() => setDay(current)}>Kỳ đang mở</button>}
         <button className={`${btnSecondary} px-3 ml-auto`} onClick={() => load(true)} aria-label="Làm mới"><RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} /></button>
       </div>
-      <div className="text-[13px] text-stone-500 mb-3">{weekdayText(day)}, {dayText(day)} · hạn {deadline}{day === current ? ' · đang mở' : ''}</div>
+      <div className="text-[13px] text-stone-500 mb-3">{weekdayText(day)}, {dayText(day)} · hạn {deadline}{day === current ? ' · đang mở' : ''}
+        {b?.closed === true && <span className="text-stone-700 font-semibold" data-testid="board-closed"> · đã chốt kỳ, không sửa được nội dung</span>}
+        {b && b.closed === false && (b.editUnits || []).length > 0 && <span className="text-emerald-700 font-semibold"> · kỳ chưa chốt, sửa được nội dung</span>}</div>
 
       {err && <div className="rounded-lg bg-red-50 text-red-800 px-4 py-3 text-sm">{err}</div>}
       {!b && !err && <div className="py-10 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-stone-400" /></div>}
@@ -113,11 +115,15 @@ export const DailyBoardView: React.FC<Props> = ({ initialDay, deadline }) => {
                   <div className="min-w-0 flex-1">
                     <div className="font-semibold text-[15px] text-stone-900 leading-tight">{u.unitName}</div>
                     <div className="text-[12px] text-stone-500 truncate">
-                      {r ? <>Đ/c {r.reporterName} · {vnTime(r.submittedAt)}{r.late && <span className="text-red-700 font-semibold"> · muộn</span>}</> : 'Chưa có ai báo cáo'}
+                      {r ? <>Đ/c {r.reporterName} · {vnTime(r.submittedAt)}{r.late && <span className="text-red-700 font-semibold"> · muộn</span>}{r.editorName && <span className="text-blue-700 font-semibold"> · đ/c {r.editorName} đã sửa</span>}</> : 'Chưa có ai báo cáo'}
                       {u.flash.length > 0 && <span className="text-red-700 font-semibold"> · {u.flash.length} báo nhanh</span>}
                     </div>
                   </div>
                   {!r ? <Chip tone="red">Chưa báo</Chip> : r.status === 'NORMAL' ? <Chip tone="green">Bình thường</Chip> : <Chip tone="orange">{r.incidents.length} vụ việc</Chip>}
+                  {r && onEdit && (b?.editUnits || []).includes(u.unit) && (
+                    <button className="h-8 px-2.5 rounded-lg border border-stone-300 bg-white text-[13px] font-semibold text-stone-700 inline-flex items-center gap-1 hover:bg-stone-50"
+                      onClick={() => onEdit(u.unit, day)} data-testid="board-edit" aria-label={`Sửa báo cáo ${u.unitName}`}><Pencil className="w-3.5 h-3.5" />Sửa</button>
+                  )}
                   {r && <button className="p-1.5 -mr-1 rounded-lg text-stone-400 hover:bg-stone-100" onClick={() => setHist(u.unit)} aria-label="Lịch sử"><History className="w-4 h-4" /></button>}
                 </div>
               );
@@ -190,6 +196,7 @@ export const HistorySheet: React.FC<{ open: boolean; day: string; unit: DailyUni
             {v.late && <Chip tone="red">Muộn</Chip>}
           </div>
           <div className="text-[13px] text-stone-600 mt-1">Đ/c {v.reporterName} ({ROLE_TEXT[v.reporterRole] || v.reporterRole}) · {vnDateTime(v.submittedAt)}</div>
+          {v.editorName && <div className="text-[13px] text-blue-800 mt-0.5">Chỉnh sửa bởi đ/c {v.editorName} (kỳ chưa chốt)</div>}
           {v.reason && <div className="text-[13px] text-stone-700 mt-0.5">Lý do đính chính: {v.reason}</div>}
           {v.note && <div className="text-sm mt-1 whitespace-pre-line">{v.note}</div>}
           {v.incidents.map((i, k) => <IncidentView key={i.id || i.key} i={i} n={k + 1} dupLabel={null} />)}

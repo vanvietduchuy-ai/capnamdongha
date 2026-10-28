@@ -473,6 +473,8 @@ export interface DailyReport {
   submittedAt: number;
   late: boolean;
   reason?: string | null;
+  editorId?: string | null;    // người quản lý / tổ trưởng sửa hộ (kỳ chưa chốt)
+  editorName?: string | null;
   deadlineAt: number;
   incidents: DailyIncident[];
 }

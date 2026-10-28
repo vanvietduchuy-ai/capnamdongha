@@ -148,7 +148,7 @@ export const DailyHub: React.FC<Props> = ({ currentUser, openUnit, onOpened }) =
             {!notOpen && overdueBlock}
           </div>
         )}
-        {active === 'BOARD' && <DailyBoardView initialDay={me.currentDay!} deadline={deadline} />}
+        {active === 'BOARD' && <DailyBoardView initialDay={me.currentDay!} deadline={deadline} onEdit={(unit, day) => setForm({ unit, day, reported: true })} />}
         {active === 'STATS' && <DailyStats currentDay={me.currentDay!} />}
         {active === 'SETUP' && <DailySettings me={currentUser} deadline={deadline} open={me.open} onDeadlineChanged={load} />}
       </div>

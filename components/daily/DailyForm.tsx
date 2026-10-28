@@ -39,7 +39,7 @@ const fmtLeft = (ms: number) => {
 };
 
 /** Biểu mẫu báo cáo ngày của 1 đầu mối — hiện ngay, dữ liệu máy chủ tải song song */
-export const DailyForm: React.FC<Props> = ({ day, unit, deadline, clockOffset, reported, onBack, onSubmitted }) => {
+export const DailyForm: React.FC<Props> = ({ me, day, unit, deadline, clockOffset, reported, onBack, onSubmitted }) => {
   const initDraft = useMemo(() => loadDraft(day, unit), [day, unit]);
   const [info, setInfo] = useState<Partial<DailyGet> | null>(null);
   const [err, setErr] = useState('');
@@ -163,6 +163,7 @@ export const DailyForm: React.FC<Props> = ({ day, unit, deadline, clockOffset, r
             {shown.late && <Chip tone="red">Nộp muộn</Chip>}
           </div>
           <div className="text-[13px] text-stone-500">Đ/c {shown.reporterName} · {vnTime(shown.submittedAt)}{shown.version > 1 ? ` · bản ${shown.version}` : ''}</div>
+          {shown.editorName && <div className="text-[13px] text-blue-800 mt-0.5" data-testid="daily-editor">Chỉnh sửa bởi đ/c {shown.editorName} lúc {vnTime(shown.submittedAt)}</div>}
           {shown.reason && <div className="text-[13px] text-stone-600 mt-1">Lý do đính chính: {shown.reason}</div>}
           {shown.note && <div className="text-[15px] text-stone-700 mt-2 whitespace-pre-line">{shown.note}</div>}
           {shown.incidents.map((i, k) => <IncidentView key={i.key} i={i} n={k + 1} others={info?.others || []} />)}
@@ -191,7 +192,9 @@ export const DailyForm: React.FC<Props> = ({ day, unit, deadline, clockOffset, r
         <b>Kỳ báo cáo ngày {dayShort(day)} chưa mở.</b> Nhận báo cáo từ <b>{vnDateTime(openAt)}</b>. Nếu đồng chí đang báo tình hình ngày {dayShort(addDays(day, -1))} (kỳ vừa chốt), quay lại và chọn <b>Nộp bù</b>.
         {canFlash && <> Vụ việc nghiêm trọng mới xảy ra: dùng <b>Báo cáo nhanh</b> bên dưới.</>}</div>}
       {!notOpen && info && !info.canSubmit && <div className="mb-3 rounded-xl bg-amber-50 text-amber-900 px-4 py-3 text-[14px]">Tài khoản này chỉ xem, không báo cáo ngày.</div>}
-      {rep && <div className="mb-3 rounded-xl bg-blue-50 text-blue-900 px-4 py-2.5 text-[14px]">Đính chính bản nộp lúc {vnDateTime(rep.submittedAt)} (đ/c {rep.reporterName}).</div>}
+      {rep && <div className="mb-3 rounded-xl bg-blue-50 text-blue-900 px-4 py-2.5 text-[14px]">{info?.canEdit && rep.reporterId !== me.id
+        ? <>Sửa hộ báo cáo của đ/c {rep.reporterName} (nộp lúc {vnDateTime(rep.submittedAt)}). Kỳ chưa chốt nên được sửa; bản này ghi tên đồng chí là người chỉnh sửa, người báo cáo gốc vẫn giữ nguyên.</>
+        : <>Đính chính bản nộp lúc {vnDateTime(rep.submittedAt)} (đ/c {rep.reporterName}).</>}</div>}
 
       {/* Tình hình trong kỳ */}
       <div className="grid grid-cols-2 gap-2.5 mb-3" role="radiogroup" aria-label="Tình hình trong kỳ">
