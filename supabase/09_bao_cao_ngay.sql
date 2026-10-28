@@ -335,7 +335,10 @@ BEGIN
   mgr := can_manage_daily(actor);
   v_edit := daily_can_edit(actor, p_day, p_unit);
   IF v_role IS NULL AND NOT mgr AND NOT v_edit THEN RETURN err('Tài khoản này không dùng để báo cáo ngày.'); END IF;
-  -- Vụ việc các đầu mối khác đã báo cùng ngày (tóm tắt, để chọn "trùng với vụ đã có")
+  -- Vụ việc các đầu mối khác đã báo cùng ngày (tóm tắt, để chọn "trùng với vụ đã có").
+  -- CHỈ người quản lý mới thấy; cán bộ chỉ thấy nội dung của đầu mối mình báo cáo, không xem được tổ khác.
+  others := '[]'::jsonb;
+  IF mgr THEN
   SELECT coalesce(jsonb_agg(jsonb_build_object('key', i.key, 'unit', i.unit, 'unitName', daily_unit_name(i.unit), 'field', i.field,
            'location', i.location, 'occurredAt', i."occurredAt", 'summary', left(i.summary, 200)) ORDER BY i.unit, i.ord), '[]'::jsonb)
     INTO others
@@ -345,6 +348,7 @@ BEGIN
            'field', f.data->>'field', 'location', f.data->>'location', 'occurredAt', f.data->>'occurredAt', 'summary', left(f.data->>'summary', 200), 'flash', true))
       FROM daily_flash f WHERE f.day = p_day AND f.unit <> p_unit
        AND NOT EXISTS (SELECT 1 FROM daily_incidents i JOIN daily_reports r ON r.id = i."reportId" WHERE r.active AND i.key = f.key)), '[]'::jsonb);
+  END IF;
   RETURN jsonb_build_object('ok', true, 'role', v_role, 'canSubmit', v_role IS NOT NULL OR v_edit, 'canEdit', v_edit,
     'day', p_day, 'currentDay', daily_current_day(),
     'deadlineAt', (extract(epoch FROM daily_deadline_at(p_day)) * 1000)::bigint,
