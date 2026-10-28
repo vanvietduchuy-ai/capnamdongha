@@ -43,6 +43,8 @@ export interface FaceFrame {
   yaw: number;
   /** Khuôn mặt chiếm bao nhiêu phần chiều rộng khung hình */
   size: number;
+  /** 68 điểm đặc trưng, toạ độ theo điểm ảnh của video gốc */
+  pts: { x: number; y: number }[];
 }
 
 const detectorOpts = (api: FaceApi, inputSize = 224) =>
@@ -65,8 +67,8 @@ const padded = (src: CanvasImageSource, sw: number, sh: number, k = 0.35): { c: 
 export const detectFrame = async (api: FaceApi, src: HTMLVideoElement, pad = false): Promise<FaceFrame | null> => {
   const W = src.videoWidth || 1, H = src.videoHeight || 1;
   let input: HTMLVideoElement | HTMLCanvasElement = src;
-  let k = 1;
-  if (pad) { const p = padded(src, W, H); input = p.c; k = p.scale; }
+  let k = 1, ox = 0, oy = 0;
+  if (pad) { const p = padded(src, W, H); input = p.c; k = p.scale; ox = p.ox; oy = p.oy; }
   const r = await api.detectSingleFace(input, detectorOpts(api)).withFaceLandmarks(true);
   if (!r) return null;
   const pts = r.landmarks.positions;
@@ -76,7 +78,8 @@ export const detectFrame = async (api: FaceApi, src: HTMLVideoElement, pad = fal
     score: r.detection.score,
     box: r.detection.box,
     yaw: span > 0 ? (nx - lx) / span : 0.5,
-    size: r.detection.box.width / k / W
+    size: r.detection.box.width / k / W,
+    pts: pts.map(q => ({ x: (q.x - ox) / k, y: (q.y - oy) / k }))
   };
 };
 

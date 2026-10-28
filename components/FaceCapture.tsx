@@ -3,6 +3,7 @@ import { Camera, Loader2, AlertCircle, RotateCcw, ImageUp, Copy, CheckCircle2, X
 import { loadFaceApi, detectFrame, captureFace, faceFromFile, mergeFaces, FaceResult } from '../lib/faceCheck';
 import { detectInstallEnv } from '../lib/install';
 import { Button, haptic } from './UI';
+import { drawMesh, smooth, MeshState, Pt } from '../lib/faceMesh';
 
 export type FaceOutcome = FaceResult | { none: true; reason: string };
 
@@ -30,6 +31,10 @@ export const FaceCapture: React.FC<Props> = ({ mode, onDone, onCancel }) => {
   const streamRef = useRef<MediaStream | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
   const aliveRef = useRef(true);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const meshRef = useRef<MeshState>({ pts: null, seen: 0, vw: 0, vh: 0 });
+  const [showMesh, setShowMesh] = useState(true);
+  const showMeshRef = useRef(true);
   const [phase, setPhase] = useState<Phase>('loading');
   const phaseRef = useRef<Phase>('loading');
   const [hint, setHint] = useState('');
@@ -103,6 +108,7 @@ export const FaceCapture: React.FC<Props> = ({ mode, onDone, onCancel }) => {
         if (f) misses = 0;
       } catch { /* bỏ qua khung lỗi */ }
       if (!aliveRef.current) return;
+      if (f) meshRef.current = { ...meshRef.current, pts: f.pts, seen: Date.now(), vw: v.videoWidth, vh: v.videoHeight };
       const p = phaseRef.current;
       if (!f) { setHint('Đưa cả khuôn mặt vào khung, cầm máy xa hơn một chút, nơi đủ sáng'); streak = 0; }
       else if (f.size < 0.16) { setHint('Đưa máy lại gần mặt hơn'); streak = 0; }
@@ -206,7 +212,26 @@ export const FaceCapture: React.FC<Props> = ({ mode, onDone, onCancel }) => {
   useEffect(() => {
     aliveRef.current = true;
     start();
-    return () => { aliveRef.current = false; stopCamera(); };
+    // Vẽ lưới ~1000 điểm bám khuôn mặt (chạy riêng, mượt hơn nhịp dò mặt)
+    let raf = 0, cur: Pt[] | null = null;
+    const tick = (t: number) => {
+      raf = requestAnimationFrame(tick);
+      const cv = canvasRef.current; if (!cv) return;
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
+      const cw = cv.clientWidth, ch = cv.clientHeight;
+      if (cv.width !== Math.round(cw * dpr)) { cv.width = Math.round(cw * dpr); cv.height = Math.round(ch * dpr); }
+      const g = cv.getContext('2d'); if (!g) return;
+      g.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const st = meshRef.current, ph = phaseRef.current;
+      const age = Date.now() - st.seen;
+      if (!showMeshRef.current || !st.pts) { g.clearRect(0, 0, cw, ch); return; }
+      cur = smooth(cur, st.pts, 0.35);
+      const alpha = ph === 'done' ? 0.9 : Math.max(0, Math.min(1, 1.4 - age / 700));
+      const color = ph === 'done' ? '#34d399' : ph === 'turn' ? '#fcd34d' : '#4ade80';
+      drawMesh(g, cw, ch, st, cur, color, alpha, t);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => { aliveRef.current = false; cancelAnimationFrame(raf); stopCamera(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -234,11 +259,18 @@ export const FaceCapture: React.FC<Props> = ({ mode, onDone, onCancel }) => {
 
         <div className="relative mt-3 rounded-xl overflow-hidden bg-black aspect-[3/4]">
           <video ref={videoRef} muted playsInline autoPlay className="absolute inset-0 w-full h-full object-cover" style={{ transform: 'scaleX(-1)' }} />
+          <canvas ref={canvasRef} className="absolute inset-0 w-full h-full pointer-events-none" aria-hidden="true" />
           {/* Khung bầu dục hướng dẫn */}
           <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
             <div className={`w-[62%] aspect-[3/4] rounded-[50%] border-4 transition-colors ${phase === 'done' ? 'border-emerald-400' : phase === 'turn' ? 'border-amber-300' : 'border-white/80'}`}
               style={{ boxShadow: '0 0 0 9999px rgba(0,0,0,.35)' }} />
           </div>
+          {phase !== 'loading' && phase !== 'error' && (
+            <button type="button" onClick={() => { showMeshRef.current = !showMeshRef.current; setShowMesh(showMeshRef.current); }}
+              className="absolute top-2 right-2 text-[11px] text-white/90 bg-black/50 rounded-md px-2 py-1">
+              Lưới {showMesh ? 'bật' : 'tắt'}
+            </button>
+          )}
           {phase === 'loading' && (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/70 text-white text-sm px-6 text-center">
               <Loader2 className="w-8 h-8 animate-spin" /><span>{loadMsg}</span>
