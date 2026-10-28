@@ -104,6 +104,17 @@ INSERT INTO app_settings (key, value) VALUES
   ('daily_late_days',   '7')       -- được nộp bù tối đa bao nhiêu ngày
 ON CONFLICT (key) DO NOTHING;
 
+-- Nhật ký xoá nội dung báo cáo ngày (chỉ Quản trị viên xoá được; ghi lại ai xoá, xoá gì)
+CREATE TABLE IF NOT EXISTS daily_delete_log (id text PRIMARY KEY);
+ALTER TABLE daily_delete_log ADD COLUMN IF NOT EXISTS day             date;
+ALTER TABLE daily_delete_log ADD COLUMN IF NOT EXISTS unit            text;
+ALTER TABLE daily_delete_log ADD COLUMN IF NOT EXISTS mode            text;     -- HISTORY (chỉ xoá các bản cũ) | ALL (xoá toàn bộ báo cáo của đầu mối ngày đó)
+ALTER TABLE daily_delete_log ADD COLUMN IF NOT EXISTS versions        int;      -- số phiên bản đã xoá
+ALTER TABLE daily_delete_log ADD COLUMN IF NOT EXISTS incidents       int;      -- số vụ việc đã xoá
+ALTER TABLE daily_delete_log ADD COLUMN IF NOT EXISTS "deletedBy"     text;
+ALTER TABLE daily_delete_log ADD COLUMN IF NOT EXISTS "deletedByName" text;
+ALTER TABLE daily_delete_log ADD COLUMN IF NOT EXISTS "deletedAt"     bigint;
+
 -- ---------------------------------------------------------------------
 -- 2. QUYỀN TRUY CẬP: không ai đọc/ghi trực tiếp
 -- ---------------------------------------------------------------------
@@ -111,7 +122,8 @@ ALTER TABLE daily_reports   ENABLE ROW LEVEL SECURITY;
 ALTER TABLE daily_incidents ENABLE ROW LEVEL SECURITY;
 ALTER TABLE daily_flash     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE daily_dups      ENABLE ROW LEVEL SECURITY;
-REVOKE ALL ON daily_reports, daily_incidents, daily_flash, daily_dups FROM anon, authenticated;
+ALTER TABLE daily_delete_log ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON daily_reports, daily_incidents, daily_flash, daily_dups, daily_delete_log FROM anon, authenticated;
 
 -- ---------------------------------------------------------------------
 -- 3. HÀM NỘI BỘ
@@ -497,7 +509,7 @@ BEGIN
   RETURN jsonb_build_object('ok', true, 'day', p_day, 'currentDay', daily_current_day(), 'canManage', mgr,
     'deadlineAt', (extract(epoch FROM daily_deadline_at(p_day)) * 1000)::bigint,
     'periodFrom', (extract(epoch FROM daily_deadline_at(p_day - 1)) * 1000)::bigint,
-    'units', units, 'editUnits', edits, 'closed', now() > daily_deadline_at(p_day),
+    'units', units, 'editUnits', edits, 'closed', now() > daily_deadline_at(p_day), 'isAdmin', actor.role = 'ADMIN',
     'dups', CASE WHEN mgr THEN coalesce((SELECT jsonb_object_agg(key, coalesce("dupOf", '')) FROM daily_dups WHERE day = p_day), '{}'::jsonb) ELSE '{}'::jsonb END);
 END;
 $$;
@@ -596,6 +608,38 @@ BEGIN
 END;
 $$;
 
+-- Xoá nội dung báo cáo ngày — CHỈ Quản trị viên (ADMIN). Không khôi phục được; có ghi nhật ký.
+--   p_mode = 'HISTORY': xoá các phiên bản cũ (đã bị thay thế), giữ bản đang hiệu lực
+--   p_mode = 'ALL'    : xoá toàn bộ báo cáo của đầu mối trong ngày đó (mọi phiên bản, vụ việc, báo cáo nhanh, đánh dấu trùng)
+CREATE OR REPLACE FUNCTION app_daily_delete(p_token text, p_day date, p_unit text, p_mode text)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, extensions AS $$
+DECLARE actor users%ROWTYPE; n_ver int := 0; n_inc int := 0;
+BEGIN
+  actor := session_user_row(p_token);
+  IF actor.id IS NULL THEN RETURN expired_msg(); END IF;
+  IF actor.role <> 'ADMIN' THEN RETURN err('Chỉ Quản trị viên mới được xoá nội dung báo cáo ngày.'); END IF;
+  IF NOT (p_unit = ANY (daily_units())) THEN RETURN err('Đầu mối báo cáo không hợp lệ.'); END IF;
+  IF p_mode NOT IN ('HISTORY', 'ALL') THEN RETURN err('Kiểu xoá không hợp lệ.'); END IF;
+  IF p_mode = 'HISTORY' THEN
+    WITH d AS (DELETE FROM daily_incidents WHERE "reportId" IN (SELECT id FROM daily_reports WHERE day = p_day AND unit = p_unit AND NOT active) RETURNING 1)
+      SELECT count(*) INTO n_inc FROM d;
+    WITH d AS (DELETE FROM daily_reports WHERE day = p_day AND unit = p_unit AND NOT active RETURNING 1)
+      SELECT count(*) INTO n_ver FROM d;
+    IF n_ver = 0 THEN RETURN err('Không có phiên bản cũ nào để xoá.'); END IF;
+  ELSE
+    DELETE FROM daily_dups WHERE key IN (SELECT key FROM daily_incidents WHERE day = p_day AND unit = p_unit);
+    DELETE FROM daily_flash WHERE day = p_day AND unit = p_unit;
+    WITH d AS (DELETE FROM daily_incidents WHERE day = p_day AND unit = p_unit RETURNING 1)
+      SELECT count(*) INTO n_inc FROM d;
+    WITH d AS (DELETE FROM daily_reports WHERE day = p_day AND unit = p_unit RETURNING 1)
+      SELECT count(*) INTO n_ver FROM d;
+  END IF;
+  INSERT INTO daily_delete_log (id, day, unit, mode, versions, incidents, "deletedBy", "deletedByName", "deletedAt")
+  VALUES (new_id('dl'), p_day, p_unit, p_mode, n_ver, n_inc, actor.id, actor."fullName", now_ms());
+  RETURN jsonb_build_object('ok', true, 'versions', n_ver, 'incidents', n_inc);
+END;
+$$;
+
 -- Đổi giờ chốt / hạn nộp và giờ mở kỳ (chỉ Quản trị viên, Trưởng CAP)
 DROP FUNCTION IF EXISTS app_daily_settings(text, text);
 CREATE OR REPLACE FUNCTION app_daily_settings(p_token text, p_deadline text, p_open text DEFAULT NULL)
@@ -643,7 +687,7 @@ BEGIN
            WHERE n.nspname = 'public'
              AND p.proname IN ('app_daily_me','app_daily_get','app_daily_submit','app_daily_flash','app_daily_board',
                                'app_daily_history','app_daily_range','app_daily_mark_dup',
-                               'app_daily_remind','app_daily_settings')
+                               'app_daily_remind','app_daily_settings','app_daily_delete')
   LOOP
     EXECUTE format('REVOKE EXECUTE ON FUNCTION %s FROM PUBLIC', f.sig);
     EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO anon, authenticated', f.sig);
@@ -651,7 +695,7 @@ BEGIN
   FOR f IN SELECT p.oid::regprocedure AS sig FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
            WHERE n.nspname = 'public'
              AND p.proname IN ('daily_role','daily_uname','daily_notify','daily_managers','daily_report_json',
-                               'daily_unit_json','daily_remind','daily_deadline_time','daily_open_time')
+                               'daily_unit_json','daily_remind','daily_deadline_time','daily_open_time','daily_can_edit')
   LOOP
     EXECUTE format('REVOKE EXECUTE ON FUNCTION %s FROM PUBLIC, anon, authenticated', f.sig);
   END LOOP;

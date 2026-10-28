@@ -100,7 +100,7 @@ export interface DailyGet {
 export interface DailyBoard {
   day: string; currentDay: string; canManage: boolean; deadlineAt: number; periodFrom: number;
   units: DailyUnitInfo[]; dups: Record<string, string>;
-  editUnits?: DailyUnit[]; closed?: boolean;   // đầu mối được sửa hộ báo cáo (kỳ chưa chốt) — máy chủ bản 6 trở lên
+  editUnits?: DailyUnit[]; closed?: boolean; isAdmin?: boolean;   // đầu mối được sửa hộ báo cáo (kỳ chưa chốt) — máy chủ bản 6 trở lên
 }
 export interface DailyRangeReport {
   id: string; day: string; unit: DailyUnit; status: DailyStatus; note?: string | null;
@@ -163,6 +163,9 @@ export const Daily = {
   },
   markDup: (day: string, key: string, dupOf: string | null, clear = false) =>
     callRpc('app_daily_mark_dup', { p_token: tok(), p_day: day, p_key: key, p_dup_of: dupOf || '', p_clear: clear }),
+  /** Chỉ Quản trị viên: xoá các bản cũ (HISTORY) hoặc toàn bộ báo cáo của đầu mối trong ngày (ALL). Không khôi phục được. */
+  remove: (day: string, unit: DailyUnit, mode: 'HISTORY' | 'ALL') =>
+    callRpc<{ versions: number; incidents: number }>('app_daily_delete', { p_token: tok(), p_day: day, p_unit: unit, p_mode: mode }),
   remind: (day: string) => callRpc<{ sent: number }>('app_daily_remind', { p_token: tok(), p_day: day }),
   setDeadline: (hhmm: string, open?: string) => callRpc('app_daily_settings', { p_token: tok(), p_deadline: hhmm, ...(open ? { p_open: open } : {}) })
 };

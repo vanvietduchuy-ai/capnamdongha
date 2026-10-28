@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { BellRing, ChevronLeft, ChevronRight, FileText, History, Loader2, Pencil, RefreshCw, Siren } from 'lucide-react';
+import { BellRing, ChevronLeft, ChevronRight, FileText, History, Loader2, Pencil, RefreshCw, Siren, Trash2 } from 'lucide-react';
 import { DailyIncident, DailyReport, DailyUnit } from '../../types';
 import {
   addDays, boardIncidents, Daily, DailyBoard as Board, dayText, dupTarget, exportDailyWord, ROLE_TEXT, Signer, totalsByField, unitName, vnDateTime, vnTime, weekdayText
@@ -22,6 +22,7 @@ export const DailyBoardView: React.FC<Props> = ({ initialDay, deadline, onEdit }
   const [msg, setMsg] = useState('');
   const [hist, setHist] = useState<DailyUnit | null>(null);
   const [signOpen, setSignOpen] = useState(false);
+  const [del, setDel] = useState<{ unit: DailyUnit; versions: number } | null>(null);
 
   const load = useCallback(async (quiet = false) => {
     if (!quiet) { setB(null); setErr(''); }
@@ -125,6 +126,10 @@ export const DailyBoardView: React.FC<Props> = ({ initialDay, deadline, onEdit }
                       onClick={() => onEdit(u.unit, day)} data-testid="board-edit" aria-label={`Sửa báo cáo ${u.unitName}`}><Pencil className="w-3.5 h-3.5" />Sửa</button>
                   )}
                   {r && <button className="p-1.5 -mr-1 rounded-lg text-stone-400 hover:bg-stone-100" onClick={() => setHist(u.unit)} aria-label="Lịch sử"><History className="w-4 h-4" /></button>}
+                  {(r || u.versions > 0) && b?.isAdmin && (
+                    <button className="p-1.5 -mr-1 rounded-lg text-red-400 hover:bg-red-50 hover:text-red-700" onClick={() => setDel({ unit: u.unit, versions: u.versions })}
+                      aria-label={`Xoá nội dung báo cáo ${u.unitName}`} data-testid="board-delete"><Trash2 className="w-4 h-4" /></button>
+                  )}
                 </div>
               );
             })}
@@ -162,6 +167,7 @@ export const DailyBoardView: React.FC<Props> = ({ initialDay, deadline, onEdit }
         </>
       )}
       <HistorySheet open={!!hist} day={day} unit={hist || 'CSKV'} onClose={() => setHist(null)} />
+      <DeleteSheet target={del} day={day} onClose={() => setDel(null)} onDone={m => { setDel(null); setMsg(m); load(true); }} />
       <SignerSheet open={signOpen} onClose={() => setSignOpen(false)} onExport={async s => { if (b) await exportDailyWord(b as Board, deadline, s); setSignOpen(false); }} />
     </div>
   );
@@ -173,6 +179,47 @@ const Stat: React.FC<{ label: string; value: React.ReactNode; tone?: string }> =
     <div className={`text-xl md:text-2xl font-bold tabular ${tone}`}>{value}</div>
   </div>
 );
+
+/** Quản trị viên xoá nội dung báo cáo ngày: chỉ các bản cũ (lịch sử) hoặc toàn bộ báo cáo của đầu mối trong ngày. Không khôi phục được. */
+const DeleteSheet: React.FC<{ target: { unit: DailyUnit; versions: number } | null; day: string; onClose: () => void; onDone: (msg: string) => void }> = ({ target, day, onClose, onDone }) => {
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const [sure, setSure] = useState<'HISTORY' | 'ALL' | null>(null);
+  useEffect(() => { setBusy(false); setErr(''); setSure(null); }, [target]);
+  if (!target) return null;
+  const go = async (mode: 'HISTORY' | 'ALL') => {
+    setBusy(true); setErr('');
+    const r = await Daily.remove(day, target.unit, mode);
+    setBusy(false);
+    if (!r.ok) { setErr(r.message || 'Không xoá được.'); return; }
+    onDone(mode === 'ALL' ? `Đã xoá toàn bộ báo cáo ${unitName(target.unit)} ngày ${dayText(day)} (${r.versions} phiên bản, ${r.incidents} vụ việc).`
+      : `Đã xoá ${r.versions} phiên bản cũ của ${unitName(target.unit)} ngày ${dayText(day)}, giữ bản đang hiệu lực.`);
+  };
+  return (
+    <Sheet open onClose={onClose} title={`Xoá nội dung · ${unitName(target.unit)} · ${dayText(day)}`} testId="daily-delete">
+      <div className="space-y-3">
+        <p className="text-[14px] text-stone-700">Chỉ Quản trị viên được xoá. <b>Xoá xong không khôi phục được</b> (hệ thống chỉ ghi lại ai xoá, xoá lúc nào).</p>
+        {err && <div className="text-sm text-red-700 bg-red-50 rounded-lg px-3 py-2">{err}</div>}
+        <div className={`${card} p-3`}>
+          <div className="font-semibold text-stone-900 text-[15px]">Xoá lịch sử (các bản cũ)</div>
+          <div className="text-[13px] text-stone-600 mb-2">Giữ bản đang hiệu lực, xoá các phiên bản đã bị thay thế.{target.versions <= 1 ? ' Đầu mối này chưa có bản cũ.' : ` Hiện có ${target.versions - 1} bản cũ.`}</div>
+          {sure === 'HISTORY'
+            ? <div className="flex gap-2"><button className={btnSecondary} onClick={() => setSure(null)} disabled={busy}>Huỷ</button>
+                <button className={btnPrimary} onClick={() => go('HISTORY')} disabled={busy} data-testid="delete-history-ok">{busy && <Loader2 className="w-4 h-4 animate-spin" />}Xác nhận xoá lịch sử</button></div>
+            : <button className={btnSecondary} onClick={() => setSure('HISTORY')} disabled={target.versions <= 1}>Xoá lịch sử</button>}
+        </div>
+        <div className={`${card} p-3 border-red-200`}>
+          <div className="font-semibold text-red-800 text-[15px]">Xoá toàn bộ báo cáo ngày {dayText(day)}</div>
+          <div className="text-[13px] text-stone-600 mb-2">Xoá mọi phiên bản, vụ việc, báo cáo nhanh và đánh dấu trùng của đầu mối này trong ngày. Đầu mối sẽ trở về trạng thái chưa báo cáo.</div>
+          {sure === 'ALL'
+            ? <div className="flex gap-2"><button className={btnSecondary} onClick={() => setSure(null)} disabled={busy}>Huỷ</button>
+                <button className="inline-flex items-center justify-center gap-1.5 h-10 px-4 rounded-xl bg-red-700 text-white font-semibold text-[14px] disabled:opacity-60" onClick={() => go('ALL')} disabled={busy} data-testid="delete-all-ok">{busy && <Loader2 className="w-4 h-4 animate-spin" />}Xác nhận xoá toàn bộ</button></div>
+            : <button className="inline-flex items-center justify-center gap-1.5 h-10 px-4 rounded-xl border border-red-300 text-red-700 font-semibold text-[14px] hover:bg-red-50" onClick={() => setSure('ALL')}>Xoá toàn bộ</button>}
+        </div>
+      </div>
+    </Sheet>
+  );
+};
 
 /** Lịch sử các phiên bản đã nộp */
 export const HistorySheet: React.FC<{ open: boolean; day: string; unit: DailyUnit; onClose: () => void }> = ({ open, day, unit, onClose }) => {
