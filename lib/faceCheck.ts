@@ -132,6 +132,21 @@ export const captureFace = async (
   };
 };
 
+/** Khoảng cách giữa 2 bộ đặc trưng */
+export const descDist = (a: number[], b: number[]): number =>
+  Math.sqrt(a.reduce((t, v, i) => t + (v - b[i]) * (v - b[i]), 0));
+
+/** Gộp nhiều lần chụp (đa điểm): phải cùng 1 người (lệch ≤ maxGap) → lấy trung bình đặc trưng, ảnh lấy lần cuối. Không nhất quán → null */
+export const mergeFaces = (rs: FaceResult[], maxGap = 0.45): FaceResult | null => {
+  if (!rs.length) return null;
+  for (let i = 0; i < rs.length; i++) for (let j = i + 1; j < rs.length; j++)
+    if (descDist(rs[i].descriptor, rs[j].descriptor) > maxGap) return null;
+  const n = rs.length;
+  const descriptor = rs[0].descriptor.map((_, k) => Math.round(rs.reduce((t, r) => t + r.descriptor[k], 0) / n * 1e5) / 1e5);
+  const last = rs[n - 1];
+  return { ...last, descriptor };
+};
+
 /** Ảnh từ ứng dụng camera của máy (phương án dự phòng) */
 export const faceFromFile = async (api: FaceApi, file: File): Promise<FaceResult | null> => {
   const url = URL.createObjectURL(file);

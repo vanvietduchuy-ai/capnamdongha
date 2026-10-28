@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Camera, Loader2, AlertCircle, RotateCcw, ImageUp, Copy, CheckCircle2, X } from 'lucide-react';
-import { loadFaceApi, detectFrame, captureFace, faceFromFile, FaceResult } from '../lib/faceCheck';
+import { loadFaceApi, detectFrame, captureFace, faceFromFile, mergeFaces, FaceResult } from '../lib/faceCheck';
 import { detectInstallEnv } from '../lib/install';
 import { Button, haptic } from './UI';
 
@@ -89,6 +89,8 @@ export const FaceCapture: React.FC<Props> = ({ mode, onDone, onCancel }) => {
   const loop = async (api: Awaited<ReturnType<typeof loadFaceApi>>) => {
     let streak = 0, misses = 0, base = 0.5;
     let last: number | null = null;
+    let shots: FaceResult[] = [];      // các lần chụp ở nhiều thời điểm/tư thế
+    let maxTurn = 0;
     const t0 = Date.now();
     while (aliveRef.current && ['center1', 'turn', 'center2'].includes(phaseRef.current)) {
       const v = videoRef.current;
@@ -111,16 +113,34 @@ export const FaceCapture: React.FC<Props> = ({ mode, onDone, onCancel }) => {
           const steady = last != null && Math.abs(f.yaw - last) < 0.05 && Math.abs(f.yaw - 0.5) < 0.22;
           streak = steady ? streak + 1 : 0;
           if (Math.abs(f.yaw - 0.5) >= 0.22) setHint('Nhìn thẳng vào màn hình');
-          if (streak >= 3) { base = f.yaw; haptic(20); go('turn'); streak = 0; }
+          if (streak >= 3) {
+            base = f.yaw; shots = []; maxTurn = 0;
+            const a = await captureFace(api, v, true, 'camera').catch(() => null);   // điểm 1: nhìn thẳng (trước khi quay)
+            if (!aliveRef.current) return;
+            if (!a) { streak = 0; continue; }
+            shots.push(a); haptic(20); go('turn'); streak = 0;
+          }
         } else if (p === 'turn') {
-          if (Math.abs(f.yaw - base) > 0.15) { haptic(20); go('center2'); streak = 0; }
+          maxTurn = Math.max(maxTurn, Math.abs(f.yaw - base));
+          streak = Math.abs(f.yaw - base) > 0.15 ? streak + 1 : 0;      // phải giữ nghiêng ≥ 2 khung liên tiếp
+          if (streak >= 2) { haptic(20); go('center2'); streak = 0; }
         } else if (p === 'center2') {
           streak = Math.abs(f.yaw - base) < 0.08 ? streak + 1 : 0;
           if (streak >= 2) {
             go('capturing');
-            const r = await captureFace(api, v, true, 'camera').catch(() => null);
+            // điểm 2 và 3: nhìn thẳng lại, cách nhau ~0,3 giây
+            const b = await captureFace(api, v, true, 'camera').catch(() => null);
+            await new Promise(r => setTimeout(r, 300));
+            const c = b ? await captureFace(api, v, true, 'camera').catch(() => null) : null;
             if (!aliveRef.current) return;
-            if (r) { finish(r); return; }
+            if (b && c) {
+              const merged = mergeFaces([...shots, b, c]);
+              if (merged) { finish(merged); return; }
+              // 3 lần chụp không cùng 1 khuôn mặt → làm lại từ đầu
+              shots = []; maxTurn = 0; last = null;
+              setHint('Ảnh các lần chụp không thống nhất. Chỉ một người trong khung, giữ yên máy rồi làm lại');
+              go('center1'); streak = 0; continue;
+            }
             setHint('Chưa chụp rõ, giữ yên máy và nhìn thẳng');
             go('center2'); streak = 0;
           }
