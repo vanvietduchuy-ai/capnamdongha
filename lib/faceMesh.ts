@@ -60,33 +60,37 @@ const segG = (u: number, w: number, a: number, b: number, s: number): [number, n
 const T = (i: number) => [TPL[i * 2], TPL[i * 2 + 1]];
 /** Độ nhô (đơn vị = nửa rộng mặt) của khuôn mặt chuẩn: nền cầu + sống mũi, chóp mũi, hốc mắt, gờ mày, môi, cằm */
 export const heightAt = (u: number, w: number): number => {
-  let h = 0.5 * Math.sqrt(Math.max(0, 1 - u * u - w * w));
-  const [gn, t] = segG(u, w, 27, 30, 0.085); h += gn * (0.08 + 0.2 * t);
-  const tip = T(30); h += 0.14 * g2(u - tip[0], w - tip[1], 0.1);
-  for (const k of [31, 35]) { const a = T(k); h += 0.05 * g2(u - a[0], w - a[1], 0.06); }
-  for (const [a, b] of [[17, 21], [22, 26]]) h += 0.05 * segG(u, w, a, b, 0.07)[0];
-  for (const [a, b] of [[36, 39], [42, 45]]) h -= 0.07 * segG(u, w, a, b, 0.1)[0];
-  const m = T(51), mb = T(57); h += 0.06 * g2(u - (m[0] + mb[0]) / 2, w - (m[1] + mb[1]) / 2, 0.12);
-  h -= 0.035 * segG(u, w, 60, 64, 0.05)[0];
-  const c = T(8); h += 0.05 * g2(u - c[0], w - (c[1] - 0.12), 0.14);
+  let h = 0.6 * Math.sqrt(Math.max(0, 1 - u * u - w * w));
+  const [gn, t] = segG(u, w, 27, 30, 0.085); h += gn * (0.12 + 0.42 * t);
+  const tip = T(30); h += 0.3 * g2(u - tip[0], w - tip[1], 0.1);
+  for (const k of [31, 35]) { const a = T(k); h += 0.1 * g2(u - a[0], w - a[1], 0.06); }
+  for (const [a, b] of [[17, 21], [22, 26]]) h += 0.1 * segG(u, w, a, b, 0.07)[0];
+  for (const [a, b] of [[36, 39], [42, 45]]) h -= 0.14 * segG(u, w, a, b, 0.1)[0];
+  const m = T(51), mb = T(57); h += 0.12 * g2(u - (m[0] + mb[0]) / 2, w - (m[1] + mb[1]) / 2, 0.12);
+  h -= 0.07 * segG(u, w, 60, 64, 0.05)[0];
+  const c = T(8); h += 0.1 * g2(u - c[0], w - (c[1] - 0.12), 0.14);
   return h;
 };
 
 let relief: Float32Array | null = null;
+let grx: Float32Array | null = null, gry: Float32Array | null = null;   // độ dốc bề mặt tại từng đỉnh (để đổ bóng)
 let lmH: Float32Array | null = null;
 const prepare = () => {
   const m = (mesh ??= build());
-  if (!relief) { relief = new Float32Array(m.n); for (let i = 0; i < m.n; i++) relief[i] = heightAt(m.u[i], m.w[i]); }
+  if (!relief) {
+    relief = new Float32Array(m.n); grx = new Float32Array(m.n); gry = new Float32Array(m.n);
+    const e = 0.03;
+    for (let i = 0; i < m.n; i++) {
+      const u = m.u[i], w = m.w[i];
+      relief[i] = heightAt(u, w);
+      grx[i] = (heightAt(u + e, w) - heightAt(u - e, w)) / (2 * e);
+      gry[i] = (heightAt(u, w + e) - heightAt(u, w - e)) / (2 * e) / ASPECT;
+    }
+  }
   if (!lmH) { lmH = new Float32Array(68); for (let i = 0; i < 68; i++) lmH[i] = heightAt(TPL[i * 2], TPL[i * 2 + 1]); }
   return m;
 };
 
-const CONTOURS: [number[], boolean][] = [
-  [[36, 37, 38, 39, 40, 41], true], [[42, 43, 44, 45, 46, 47], true],
-  [[17, 18, 19, 20, 21], false], [[22, 23, 24, 25, 26], false],
-  [[27, 28, 29, 30], false], [[31, 32, 33, 34, 35], false],
-  [[48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59], true], [[60, 61, 62, 63, 64, 65, 66, 67], true]
-];
 
 /**
  * Lưới 3D: mỗi đỉnh có độ nhô theo khuôn mặt chuẩn (mũi cao, hốc mắt lõm, môi, cằm), xoay theo góc quay đầu ước lượng,
@@ -101,7 +105,6 @@ export const drawMesh = (
   const m = prepare();
   const sc = Math.max(cw / st.vw, ch / st.vh);
   const offx = (cw - st.vw * sc) / 2, offy = (ch - st.vh * sc) / 2;
-  const S = (p: Pt): Pt => ({ x: cw - (p.x * sc + offx), y: p.y * sc + offy });   // lật gương như video
 
   const jawL = pts[0], jawR = pts[16], chin = pts[8];
   const brow = (pts[19].y + pts[24].y) / 2;
@@ -118,7 +121,7 @@ export const drawMesh = (
   const hTip = lmH![30];
   const sinA = Math.max(-0.9, Math.min(0.9, (au[30] - TPL[60]) / hTip));
   const cosA = Math.sqrt(1 - sinA * sinA);
-  const persp = (z: number) => 1 / (1 - z * 0.3);
+  const persp = (z: number) => 1 / (1 - z * 0.15);
 
   const ru = new Float32Array(68), rw = new Float32Array(68), lu = new Float32Array(68), lw = new Float32Array(68);
   for (let i = 0; i < 68; i++) {
@@ -130,7 +133,8 @@ export const drawMesh = (
 
   const n = m.n;
   const X = new Float32Array(n), Y = new Float32Array(n), Z = new Float32Array(n);
-  const sig2 = 2 * 0.2 * 0.2;
+  const sig2 = 2 * 0.26 * 0.26;
+  const swayK = 0.16 * Math.sin(time / 650);   // lắc nhẹ: phần nhô (mũi) dịch nhiều hơn phần thấp → thấy rõ khối 3D
   for (let i = 0; i < n; i++) {
     const u = m.u[i], w = m.w[i], h = relief![i];
     const x = u * cosA + h * sinA, z = h * cosA - u * sinA, f = persp(z);
@@ -141,47 +145,61 @@ export const drawMesh = (
       const k = Math.exp(-(dx * dx + dy * dy) / sig2);
       sw += k; sx += k * ru[j]; sy += k * rw[j];
     }
-    const d = sw + 0.12;
-    const lx = (px + sx / d) * rx, ly = (py + sy / d) * ry;
+    const d = sw + 0.5;
+    const lx = (px + sx / d + z * swayK) * rx, ly = (py + sy / d) * ry;
     X[i] = cw - ((cx + lx * cr - ly * sr) * sc + offx);
     Y[i] = (cy + lx * sr + ly * cr) * sc + offy;
     Z[i] = z;
   }
 
-  g.save();
-  const bucket = [new Path2D(), new Path2D(), new Path2D()];
-  const tOf = (z: number) => Math.max(0, Math.min(1, (z + 0.05) / 0.55));
-  for (let k = 0; k < m.edges.length; k += 2) {
-    const a = m.edges[k], b = m.edges[k + 1];
-    const t = (tOf(Z[a]) + tOf(Z[b])) / 2, bi = t < 0.35 ? 0 : t < 0.7 ? 1 : 2;
-    bucket[bi].moveTo(X[a], Y[a]); bucket[bi].lineTo(X[b], Y[b]);
+  // ánh sáng (đổ bóng theo độ dốc bề mặt) + độ sâu → độ sáng từng đỉnh
+  const lx0 = -0.4 - sinA * 0.8, ly0 = -0.5, lz0 = 0.77, ln = Math.hypot(lx0, ly0, lz0);
+  const B = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const nx = -grx![i], ny = -gry![i], nl = Math.hypot(nx, ny, 1);
+    const shade = Math.max(0, (nx * lx0 + ny * ly0 + lz0) / (nl * ln));
+    const depth = Math.max(0, Math.min(1, (Z[i] + 0.1) / 1.0));
+    B[i] = Math.max(0, Math.min(1, 0.65 * depth + 0.5 * (shade - 0.5) + 0.2));
   }
-  g.strokeStyle = color;
-  g.globalAlpha = alpha * 0.22; g.lineWidth = 0.6; g.stroke(bucket[0]);
-  g.globalAlpha = alpha * 0.45; g.lineWidth = 0.8; g.stroke(bucket[1]);
-  g.globalAlpha = alpha * 0.85; g.lineWidth = 1; g.stroke(bucket[2]);
+  const rgb = hex(color), far = mixc(rgb, [0, 0, 0], 0.62), near = mixc(rgb, [255, 255, 255], 0.65);
+  const col = (b: number) => b < 0.5 ? mixc(far, rgb, b / 0.5) : mixc(rgb, near, (b - 0.5) / 0.5);
+  g.save();
+  const NB = 5, bucket = Array.from({ length: NB }, () => new Path2D());
+  for (let k = 0; k < m.edges.length; k += 2) {
+    const a = m.edges[k], b2 = m.edges[k + 1];
+    const b = (B[a] + B[b2]) / 2, bi = Math.min(NB - 1, Math.floor(b * NB));
+    if (bi === 0 && ((k >> 1) & 1)) continue;          // vùng xa/tối: bỏ bớt đường → thưa rõ
+    bucket[bi].moveTo(X[a], Y[a]); bucket[bi].lineTo(X[b2], Y[b2]);
+  }
+  for (let bi = 0; bi < NB; bi++) {
+    const b = (bi + 0.5) / NB;
+    g.strokeStyle = rgbs(col(b)); g.globalAlpha = alpha * (0.18 + 0.82 * b); g.lineWidth = 0.5 + 1.3 * b;
+    g.stroke(bucket[bi]);
+  }
 
   let top = Infinity, bot = -Infinity;
   for (let i = 0; i < n; i++) { if (Y[i] < top) top = Y[i]; if (Y[i] > bot) bot = Y[i]; }
   const band = top + ((time % 1800) / 1800) * (bot - top), bw = (bot - top) * 0.12;
-  g.fillStyle = color;
   for (let i = 0; i < n; i++) {
-    const near = Math.max(0, 1 - Math.abs(Y[i] - band) / bw), t = tOf(Z[i]);
-    const rim = m.u[i] * m.u[i] + m.w[i] * m.w[i];
-    g.globalAlpha = alpha * Math.min(1, 0.3 + 0.6 * t + 0.2 * near) * (rim > 0.8 ? 0.6 : 1);
-    const r = 0.5 + t * 1.1 + near * 1.4;
+    const b = B[i];
+    if (b < 0.3 && (i & 1)) continue;                  // vùng xa: ít điểm hơn
+    const near2 = Math.max(0, 1 - Math.abs(Y[i] - band) / bw);
+    g.fillStyle = rgbs(col(Math.min(1, b + near2 * 0.3)));
+    g.globalAlpha = alpha * Math.min(1, 0.25 + 0.75 * b + 0.2 * near2);
+    const r = 0.4 + 3.2 * b * b + near2 * 1.2;         // gần/sáng: to; xa/tối: li ti
     g.fillRect(X[i] - r / 2, Y[i] - r / 2, r, r);
   }
   const mx = cw - (cx * sc + offx);
   g.globalAlpha = alpha * 0.9; g.strokeStyle = '#ffffff'; g.lineWidth = 1.5; g.shadowColor = color; g.shadowBlur = 8;
   g.beginPath(); g.moveTo(mx - rx * sc * 1.05, band); g.lineTo(mx + rx * sc * 1.05, band); g.stroke();
   g.shadowBlur = 0;
-  g.globalAlpha = alpha * 0.9; g.strokeStyle = '#ffffff'; g.lineWidth = 1.2;
-  for (const [idx, closed] of CONTOURS) {
-    g.beginPath();
-    idx.forEach((i, k) => { const q = S(pts[i]); k ? g.lineTo(q.x, q.y) : g.moveTo(q.x, q.y); });
-    if (closed) g.closePath();
-    g.stroke();
-  }
   g.restore();
 };
+
+const hex = (c: string): [number, number, number] => {
+  const v = c.replace('#', '');
+  return [parseInt(v.slice(0, 2), 16), parseInt(v.slice(2, 4), 16), parseInt(v.slice(4, 6), 16)];
+};
+const mixc = (a: number[], b: number[], t: number): [number, number, number] =>
+  [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+const rgbs = (c: number[]) => `rgb(${c[0] | 0},${c[1] | 0},${c[2] | 0})`;
