@@ -77,7 +77,7 @@ export const drawMesh = (
   g.save();
   g.globalAlpha = alpha;
   // đường nối
-  g.strokeStyle = color; g.globalAlpha = alpha * 0.28; g.lineWidth = 0.7;
+  g.strokeStyle = color; g.globalAlpha = alpha * 0.9; g.lineWidth = 1;
   g.beginPath();
   for (let k = 0; k < m.edges.length; k += 2) { const a = m.edges[k], b = m.edges[k + 1]; g.moveTo(X[a], Y[a]); g.lineTo(X[b], Y[b]); }
   g.stroke();
@@ -87,16 +87,13 @@ export const drawMesh = (
   g.fillStyle = color;
   for (let i = 0; i < m.n; i++) {
     const near = Math.max(0, 1 - Math.abs(Y[i] - band) / bw);
-    g.globalAlpha = alpha * (0.5 + 0.5 * near);
-    const r = 0.9 + near * 1.3;
+    g.globalAlpha = alpha * (0.85 + 0.15 * near);
+    const r = 1.1 + near * 1.8;
     g.fillRect(X[i] - r / 2, Y[i] - r / 2, r, r);
   }
   // vạch quét
-  g.globalAlpha = alpha * 0.55; g.strokeStyle = '#ffffff'; g.lineWidth = 1.2;
+  g.globalAlpha = alpha * 0.9; g.strokeStyle = '#ffffff'; g.lineWidth = 1.5; g.shadowColor = color; g.shadowBlur = 8;
   const mx = cw - (cx * sc + offx);
   g.beginPath(); g.moveTo(mx - rx * sc * 1.05, band); g.lineTo(mx + rx * sc * 1.05, band); g.stroke();
-  // 68 điểm thật nổi bật
-  g.globalAlpha = alpha; g.fillStyle = '#ffffff';
-  for (const p of pts) { const q = S(p); g.beginPath(); g.arc(q.x, q.y, 1.8, 0, Math.PI * 2); g.fill(); }
   g.restore();
 };

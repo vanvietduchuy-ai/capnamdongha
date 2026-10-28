@@ -33,8 +33,10 @@ export const FaceCapture: React.FC<Props> = ({ mode, onDone, onCancel }) => {
   const aliveRef = useRef(true);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const meshRef = useRef<MeshState>({ pts: null, seen: 0, vw: 0, vh: 0 });
-  const [showMesh, setShowMesh] = useState(true);
-  const showMeshRef = useRef(true);
+  const weak = typeof navigator !== 'undefined' && (((navigator as any).deviceMemory && (navigator as any).deviceMemory <= 2) || (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 2));
+  const [showMesh, setShowMesh] = useState(!weak);
+  const [meshAuto, setMeshAuto] = useState(false);      // đã tự tắt vì máy yếu
+  const showMeshRef = useRef(!weak);
   const [phase, setPhase] = useState<Phase>('loading');
   const phaseRef = useRef<Phase>('loading');
   const [hint, setHint] = useState('');
@@ -214,8 +216,18 @@ export const FaceCapture: React.FC<Props> = ({ mode, onDone, onCancel }) => {
     start();
     // Vẽ lưới ~1000 điểm bám khuôn mặt (chạy riêng, mượt hơn nhịp dò mặt)
     let raf = 0, cur: Pt[] | null = null;
+    let lastT = 0, slowFrames = 0, okFrames = 0;
     const tick = (t: number) => {
       raf = requestAnimationFrame(tick);
+      // Máy yếu: vẽ chậm (khoảng cách giữa 2 khung > 55 ms ≈ dưới 18 khung/giây) kéo dài → tự tắt lưới
+      if (showMeshRef.current && lastT && okFrames + slowFrames >= 0) {
+        if (t - lastT > 55) slowFrames++; else okFrames++;
+        if (slowFrames + okFrames >= 40) {
+          if (slowFrames > 24) { showMeshRef.current = false; setShowMesh(false); setMeshAuto(true); }
+          slowFrames = 0; okFrames = 0;
+        }
+      }
+      lastT = t;
       const cv = canvasRef.current; if (!cv) return;
       const dpr = Math.min(window.devicePixelRatio || 1, 2);
       const cw = cv.clientWidth, ch = cv.clientHeight;
@@ -270,6 +282,9 @@ export const FaceCapture: React.FC<Props> = ({ mode, onDone, onCancel }) => {
               className="absolute top-2 right-2 text-[11px] text-white/90 bg-black/50 rounded-md px-2 py-1">
               Lưới {showMesh ? 'bật' : 'tắt'}
             </button>
+          )}
+          {meshAuto && !showMesh && phase !== 'loading' && phase !== 'error' && (
+            <div className="absolute top-9 right-2 text-[10px] text-amber-200 bg-black/55 rounded px-1.5 py-0.5">Máy yếu: đã tự tắt lưới</div>
           )}
           {phase === 'loading' && (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/70 text-white text-sm px-6 text-center">
