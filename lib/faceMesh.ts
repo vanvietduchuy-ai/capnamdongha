@@ -9,15 +9,34 @@ export type Pt = { x: number; y: number };
 interface Mesh { u: Float32Array; w: Float32Array; z: Float32Array; edges: Uint16Array; n: number }
 let mesh: Mesh | null = null;
 
+/** Đa giác vùng mặt (toạ độ chuẩn hoá): đường hàm thật (điểm 0→16 của khuôn mặt chuẩn) + vòm trán */
+let outline: [number, number][] | null = null;
+const getOutline = () => {
+  if (outline) return outline;
+  const o: [number, number][] = [];
+  for (let i = 0; i <= 16; i++) o.push([TPL[i * 2] * 1.04, TPL[i * 2 + 1]]);        // trái → cằm → phải
+  const w0 = TPL[1];
+  for (let k = 1; k < 12; k++) { const a = Math.PI * k / 12; o.push([0.979 * 1.04 * Math.cos(a), w0 - (1 + w0) * Math.sin(a)]); }   // vòm trán từ phải sang trái
+  return (outline = o);
+};
+const inside = (x: number, y: number, o: [number, number][]) => {
+  let c = false;
+  for (let i = 0, j = o.length - 1; i < o.length; j = i++) {
+    const [xi, yi] = o[i], [xj, yj] = o[j];
+    if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) c = !c;
+  }
+  return c;
+};
+
 const build = (): Mesh => {
-  // Lưới tổ ong trong hình elip (u ∈ [-1,1], w ∈ [-1,1]); chỉnh bước để ra ≈ 1000 điểm
-  let d = 0.0674, us: number[] = [], ws: number[] = [];
-  for (let it = 0; it < 12; it++) {
+  const o = getOutline();
+  let d = 0.07, us: number[] = [], ws: number[] = [];
+  for (let it = 0; it < 14; it++) {
     us = []; ws = [];
     const dy = d * Math.sqrt(3) / 2;
-    for (let j = 0, y = -1; y <= 1; y += dy, j++) {
-      for (let x = -1 + (j % 2 ? d / 2 : 0); x <= 1; x += d) {
-        if (x * x + y * y <= 1) { us.push(x); ws.push(y); }
+    for (let j = 0, y = -1.02; y <= 1.25; y += dy, j++) {
+      for (let x = -1.05 + (j % 2 ? d / 2 : 0); x <= 1.05; x += d) {
+        if (inside(x, y, o)) { us.push(x); ws.push(y); }
       }
     }
     const k = us.length / 1000;
@@ -27,7 +46,6 @@ const build = (): Mesh => {
   const n = us.length;
   const u = Float32Array.from(us), w = Float32Array.from(ws);
   const z = new Float32Array(n);
-  for (let i = 0; i < n; i++) z[i] = Math.sqrt(Math.max(0, 1 - u[i] * u[i] - w[i] * w[i]));
   const e: number[] = [], lim = d * 1.15, l2 = lim * lim;
   for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {
     const dx = u[i] - u[j], dy = w[i] - w[j];
@@ -60,7 +78,8 @@ const segG = (u: number, w: number, a: number, b: number, s: number): [number, n
 const T = (i: number) => [TPL[i * 2], TPL[i * 2 + 1]];
 /** Độ nhô (đơn vị = nửa rộng mặt) của khuôn mặt chuẩn: nền cầu + sống mũi, chóp mũi, hốc mắt, gờ mày, môi, cằm */
 export const heightAt = (u: number, w: number): number => {
-  let h = 0.6 * Math.sqrt(Math.max(0, 1 - u * u - w * w));
+  const wn = w > 0 ? w / 1.2 : w;
+  let h = 0.6 * Math.sqrt(Math.max(0, 1 - u * u - wn * wn));
   const [gn, t] = segG(u, w, 27, 30, 0.085); h += gn * (0.12 + 0.42 * t);
   const tip = T(30); h += 0.3 * g2(u - tip[0], w - tip[1], 0.1);
   for (const k of [31, 35]) { const a = T(k); h += 0.1 * g2(u - a[0], w - a[1], 0.06); }
