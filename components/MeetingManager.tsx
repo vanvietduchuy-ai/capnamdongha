@@ -80,8 +80,8 @@ export const MeetingManager: React.FC<Props> = ({ currentUser }) => {
   const [liveId, setLiveId] = useState<string | null>(null);
   const [resultId, setResultId] = useState<string | null>(null);
 
-  const canSeeAll = currentUser.role === UserRole.ADMIN || currentUser.role === UserRole.CHIEF ||
-    currentUser.role === UserRole.DEPUTY_CHIEF ||
+  // Chỉ Quản trị viên hoặc cán bộ được phân quyền điểm danh; lãnh đạo chỉ huy không mặc định có quyền.
+  const canSeeAll = currentUser.role === UserRole.ADMIN ||
     !!currentUser.permissions?.includes(UserPermission.MANAGE_ATTENDANCE);
 
   const showToast = (msg: string) => { setToast(msg); window.setTimeout(() => setToast(null), 3500); };

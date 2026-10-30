@@ -824,9 +824,9 @@ export const UserManagementModal: React.FC<UserManagementModalProps> = ({
             // Auto-assign permissions based on role
             let defaultPerms: UserPermission[] = [];
             if (newRole === UserRole.CHIEF) {
-                defaultPerms = [UserPermission.MANAGE_USERS, UserPermission.ASSIGN_TASKS, UserPermission.VIEW_STATISTICS, UserPermission.MANAGE_UTILITIES, UserPermission.MANAGE_ATTENDANCE, UserPermission.MANAGE_LEARNING, UserPermission.MANAGE_DAILY_REPORT, UserPermission.MANAGE_TASKS, UserPermission.VIEW_ALL_TASKS, UserPermission.MANAGE_PROPOSALS];
+                defaultPerms = [UserPermission.MANAGE_USERS, UserPermission.ASSIGN_TASKS, UserPermission.VIEW_STATISTICS, UserPermission.MANAGE_UTILITIES, UserPermission.MANAGE_LEARNING, UserPermission.MANAGE_DAILY_REPORT, UserPermission.MANAGE_TASKS, UserPermission.VIEW_ALL_TASKS, UserPermission.MANAGE_PROPOSALS];
             } else if (newRole === UserRole.DEPUTY_CHIEF) {
-                defaultPerms = [UserPermission.ASSIGN_TASKS, UserPermission.VIEW_STATISTICS, UserPermission.MANAGE_UTILITIES, UserPermission.MANAGE_ATTENDANCE, UserPermission.MANAGE_LEARNING, UserPermission.MANAGE_DAILY_REPORT, UserPermission.MANAGE_TASKS, UserPermission.VIEW_ALL_TASKS, UserPermission.MANAGE_PROPOSALS];
+                defaultPerms = [UserPermission.ASSIGN_TASKS, UserPermission.VIEW_STATISTICS, UserPermission.MANAGE_UTILITIES, UserPermission.MANAGE_LEARNING, UserPermission.MANAGE_DAILY_REPORT, UserPermission.MANAGE_TASKS, UserPermission.VIEW_ALL_TASKS, UserPermission.MANAGE_PROPOSALS];
             } else if (newRole === UserRole.MANAGER || newRole === UserRole.DEPUTY) {
                 defaultPerms = [UserPermission.ASSIGN_TASKS, UserPermission.VIEW_STATISTICS, UserPermission.MANAGE_UTILITIES];
             }

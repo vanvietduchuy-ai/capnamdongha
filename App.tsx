@@ -103,7 +103,7 @@ const hasPermission = (user: User | null, permission: UserPermission): boolean =
     case UserPermission.MANAGE_UTILITIES:
       return isLeader(user.role);
     case UserPermission.MANAGE_ATTENDANCE:
-      return user.role === UserRole.CHIEF || user.role === UserRole.DEPUTY_CHIEF; // Admin, Ban chỉ huy, or explicitly permitted users
+      return false; // Điểm danh: chỉ Quản trị viên (đã trả true ở trên) và cán bộ được phân quyền riêng; lãnh đạo chỉ huy KHÔNG mặc định có quyền
     case UserPermission.MANAGE_LEARNING:
       return user.role === UserRole.CHIEF || user.role === UserRole.DEPUTY_CHIEF;
     case UserPermission.MANAGE_DAILY_REPORT:

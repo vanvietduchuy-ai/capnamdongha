@@ -17,11 +17,9 @@ export const AttendanceManager: React.FC<AttendanceManagerProps> = ({ currentUse
   const [userGroups, setUserGroups] = useState<UserGroup[]>([]);
   const summaryRef = useRef<HTMLDivElement>(null);
   
-  // Đồng bộ với quy tắc phân quyền ở App: Quản trị viên, Trưởng/Phó Trưởng CAP
-  // hoặc cán bộ được cấp quyền riêng.
+  // Đồng bộ với quy tắc phân quyền ở App: chỉ Quản trị viên hoặc cán bộ được
+  // cấp quyền riêng. Lãnh đạo chỉ huy không mặc định có thẩm quyền điểm danh.
   const canManageAttendance = currentUser.role === UserRole.ADMIN ||
-                             currentUser.role === UserRole.CHIEF ||
-                             currentUser.role === UserRole.DEPUTY_CHIEF ||
                              !!currentUser.permissions?.includes(UserPermission.MANAGE_ATTENDANCE);
 
   // Form state for new session
@@ -113,10 +111,7 @@ export const AttendanceManager: React.FC<AttendanceManagerProps> = ({ currentUse
     const groupData = await MockDB.getUserGroups();
     setUserGroups(groupData);
     
-    const canSeeAll = currentUser.role === UserRole.ADMIN || 
-                     currentUser.role === UserRole.CHIEF || 
-                     (currentUser.role === UserRole.DEPUTY_CHIEF && currentUser.department === UserDepartment.PHU_TRACH_CHUNG) ||
-                     canManageAttendance;
+    const canSeeAll = canManageAttendance;
 
     // Filter out ADMIN users and restrict by department if necessary
     const eligibleUsers = userData.filter(u => {
