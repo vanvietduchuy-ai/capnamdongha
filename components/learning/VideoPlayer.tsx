@@ -93,6 +93,8 @@ export const VideoPlayer: React.FC<Props> = ({ url, kind, initialPct, onProgress
   };
   const tooFar = (t: number) => t > maxOk.current + 3;
   const showWarn = () => { setWarn('Chưa xem đến đoạn này — không tua qua phần chưa xem.'); window.setTimeout(() => setWarn(''), 2500); };
+  // Khoá tốc độ 1x để giờ học trong phần mềm luôn khớp giờ chạy trên video
+  const showRateWarn = () => { setWarn('Bài học chỉ phát ở tốc độ 1x để tính đúng thời gian học.'); window.setTimeout(() => setWarn(''), 2500); };
 
   // ---------- YouTube ----------
   const ytBox = useRef<HTMLDivElement>(null);
@@ -108,8 +110,12 @@ export const VideoPlayer: React.FC<Props> = ({ url, kind, initialPct, onProgress
         videoId: id, width: '100%', height: '100%',
         playerVars: { autoplay: 1, rel: 0, modestbranding: 1, playsinline: 1, disablekb: 1, iv_load_policy: 3, fs: 1, cc_load_policy: 0 },
         events: {
+          onPlaybackRateChange: (e: any) => {
+            if (e.data !== 1) { try { e.target.setPlaybackRate(1); } catch { /* bỏ qua */ } showRateWarn(); }
+          },
           onReady: (e: any) => {
             try {
+              e.target.setPlaybackRate?.(1);
               const d = e.target.getDuration?.() || 0;
               setDur(d);
               const at = fromStart.current ? 0 : resumeAt(d);
@@ -132,6 +138,7 @@ export const VideoPlayer: React.FC<Props> = ({ url, kind, initialPct, onProgress
             if (playing) {
               timer = window.setInterval(() => {
                 const t = player.getCurrentTime?.() || 0, d = player.getDuration?.() || 0;
+                if ((player.getPlaybackRate?.() || 1) !== 1) { player.setPlaybackRate?.(1); showRateWarn(); }
                 if (dur.current && tooFar(t)) { player.seekTo(maxOk.current, true); showWarn(); return; }
                 mark(t, d); keepPos(t, d);
               }, 1000);
@@ -154,7 +161,11 @@ export const VideoPlayer: React.FC<Props> = ({ url, kind, initialPct, onProgress
     const v = vRef.current; if (!v) return;
     const onTime = () => { if (!v.seeking) { mark(v.currentTime, v.duration); keepPos(v.currentTime, v.duration); } };
     const onSeek = () => { if (dur.current && tooFar(v.currentTime)) { v.currentTime = maxOk.current; showWarn(); } };
-    const onPlay = () => cbs.current.onPlaying(true);
+    // Đồng hồ học chỉ chạy khi hình thực sự đang chạy: đứng hình (tải) thì dừng tính giờ
+    const onPlay = () => { v.defaultPlaybackRate = 1; v.playbackRate = 1; cbs.current.onPlaying(true); };
+    const onWaiting = () => cbs.current.onPlaying(false);
+    const onPlaying = () => cbs.current.onPlaying(true);
+    const onRate = () => { if (v.playbackRate !== 1) { v.playbackRate = 1; showRateWarn(); } };
     const onPause = () => { cbs.current.onPlaying(false); keepPos(v.currentTime, v.duration, true); };
     const onEnd = () => { cbs.current.onPlaying(false); savePos(url, 0); };
     const onMeta = () => {
@@ -165,7 +176,9 @@ export const VideoPlayer: React.FC<Props> = ({ url, kind, initialPct, onProgress
     v.addEventListener('timeupdate', onTime); v.addEventListener('seeking', onSeek);
     v.addEventListener('play', onPlay); v.addEventListener('pause', onPause); v.addEventListener('ended', onEnd);
     v.addEventListener('loadedmetadata', onMeta);
+    v.addEventListener('waiting', onWaiting); v.addEventListener('playing', onPlaying); v.addEventListener('ratechange', onRate);
     return () => {
+      v.removeEventListener('waiting', onWaiting); v.removeEventListener('playing', onPlaying); v.removeEventListener('ratechange', onRate);
       v.removeEventListener('timeupdate', onTime); v.removeEventListener('seeking', onSeek);
       v.removeEventListener('play', onPlay); v.removeEventListener('pause', onPause); v.removeEventListener('ended', onEnd);
       v.removeEventListener('loadedmetadata', onMeta); keepPos(v.currentTime, v.duration, true); cbs.current.onPlaying(false);
